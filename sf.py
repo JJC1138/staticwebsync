@@ -3,9 +3,13 @@ import sys
 
 import boto
 
-from core import setup
+import core
 
-BAD_USER_EXIT = 1
+def print_log(message):
+    print message
+
+core.log = print_log
+
 FORCE_EXISTING_OPTION = '--delete-existing-bucket'
 DEFAULT_LOCATION = 'US'
 
@@ -29,4 +33,8 @@ args = arg_parser.parse_args()
 if args.bucket_location == DEFAULT_LOCATION:
     args.bucket_location = ''
 
-setup(args)
+try:
+    core.setup(args)
+except core.BadUserError, e:
+    print >>sys.stderr, e.message
+    sys.exit(1)
