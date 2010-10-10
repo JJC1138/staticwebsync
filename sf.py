@@ -10,11 +10,10 @@ def print_log(message):
 
 core.log = print_log
 
-FORCE_EXISTING_OPTION = '--delete-existing-bucket'
 DEFAULT_LOCATION = 'US'
 
 arg_parser = argparse.ArgumentParser(
-    description='Set up S3 and CloudFront for SyncFront.')
+    description='Sync static files to CloudFront')
 
 arg_parser.add_argument('--access-key-id', required=True)
 arg_parser.add_argument('--secret-access-key', required=True)
@@ -26,7 +25,7 @@ arg_parser.add_argument('--bucket-location', choices = (
     'ap-southeast-1'),
     default='US')
 arg_parser.add_argument('host_name')
-arg_parser.add_argument(FORCE_EXISTING_OPTION, action='store_true')
+arg_parser.add_argument('folder')
 
 args = arg_parser.parse_args()
 
