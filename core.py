@@ -152,6 +152,7 @@ def setup(args):
                         key.content_type == headers.get('Content-Type') and \
                         key.content_encoding == headers.get('Content-Encoding'):
 
+                        # TODO Check for other headers?
                         log('%s matches local file' % outf)
                         if not args.repair:
                             return
