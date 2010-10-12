@@ -14,7 +14,7 @@ class BadUserError(Exception):
         self.message = message
 
 def setup(args):
-    bucket_prefix = 'syncfront-' + args.host_name + '-'
+    standard_bucket_name = 'syncfront-' + args.host_name
 
     s3 = boto.connect_s3(args.access_key_id, args.secret_access_key)
 
@@ -30,20 +30,24 @@ def setup(args):
             raise e
 
     for b in all_buckets:
-        if b.name.startswith(bucket_prefix):
+        if b.name == standard_bucket_name or \
+            b.name.startswith(standard_bucket_name + '-'):
+
             bucket = b
             log('found existing bucket %s' % bucket.name)
             break
     else:
+        bucket_name = standard_bucket_name
         while True:
-            bucket_name = bucket_prefix + os.urandom(8).encode('hex')
             try:
                 log('creating bucket %s' % bucket_name)
                 bucket = s3.create_bucket(bucket_name, location=args.bucket_location)
                 break
             except boto.exception.S3CreateError, e:
                 if e.error_code == 'BucketAlreadyExists':
-                    log('bucket %s was already used (which is astonishingly unlikely)')
+                    log('bucket %s was already used by another user')
+                    bucket_name = \
+                        standard_bucket_name + '-' + os.urandom(8).encode('hex')
                     continue
                 else:
                     raise e
@@ -119,9 +123,16 @@ def setup(args):
 
             local_file = open(inf, 'rb')
 
+            type = mimetypes.guess_type(filename, strict=False)
+            headers = {}
+            if type[0] is not None:
+                headers['Content-Type'] = type[0]
+            if type[1] is not None:
+                headers['Content-Encoding'] = type[1]
+
             def upload(f):
-                # We could re-use this if uploading same file twice, but the
-                # code would be a bit messy.
+                # We could re-use this when uploading the same file twice, but
+                # the code would be a bit messy.
                 md5 = None
 
                 parts = list(os.path.split(d))
@@ -137,19 +148,37 @@ def setup(args):
                 if key is not None:
                     log('%s exists in bucket' % outf)
                     md5 = key.compute_md5(local_file)
-                    if key.etag == '"%s"' % md5[0]:
+                    if key.etag == '"%s"' % md5[0] and \
+                        key.content_type == headers.get('Content-Type') and \
+                        key.content_encoding == headers.get('Content-Encoding'):
+
                         log('%s matches local file' % outf)
-                        # TODO Check policy and headers
-                        return
+                        if not args.repair:
+                            return
+
+                        policy = key.get_acl()
+                        user_grant_okay = False
+                        public_grant_okay = False
+                        for grant in policy.acl.grants:
+                            if grant.id == policy.owner.id:
+                                user_grant_okay = grant.permission == 'FULL_CONTROL'
+                                if not user_grant_okay:
+                                    break
+                            elif grant.type == 'Group':
+                                public_grant_okay = \
+                                    grant.uri == 'http://acs.amazonaws.com/groups/global/AllUsers' and \
+                                    grant.permission == 'READ'
+                                if not public_grant_okay:
+                                    break
+                            else:
+                                break
+                        else:
+                            if user_grant_okay and public_grant_okay:
+                                log('%s ACL is fine' % outf)
+                                return
+                        log('%s ACL is wrong' % outf)
                 else:
                     key = bucket.new_key(outf)
-
-                type = mimetypes.guess_type(filename, strict=False)
-                headers = {}
-                if type[0] is not None:
-                    headers['Content-Type'] = type[0]
-                if type[1] is not None:
-                    headers['Content-Encoding'] = type[1]
 
                 log('uploading %s' % outf)
                 key.set_contents_from_file(local_file,

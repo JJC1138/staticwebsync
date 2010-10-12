@@ -18,6 +18,7 @@ arg_parser = argparse.ArgumentParser(
 arg_parser.add_argument('--access-key-id', required=True)
 arg_parser.add_argument('--secret-access-key', required=True)
 arg_parser.add_argument('--index', default='index.html')
+arg_parser.add_argument('--repair', action='store_true')
 arg_parser.add_argument('--bucket-location', choices = (
     DEFAULT_LOCATION,
     boto.s3.connection.Location.USWest,
