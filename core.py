@@ -110,6 +110,9 @@ def setup(args):
     mimetypes.types_map['.png'] = 'image/png'
     mimetypes.types_map['.jpg'] = 'image/jpeg'
 
+    # TODO Serialize these in case of failure, and resume when restarting:
+    invalidations = []
+
     dir = os.path.normpath(args.folder)
 
     if not os.path.exists(dir):
@@ -193,7 +196,7 @@ def setup(args):
                 key.set_contents_from_file(local_file,
                     headers, policy='public-read', md5=md5)
                 if existed:
-                    pass # TODO Invalidate cache.
+                    invalidations.append(key.name)
 
             if filename == args.index and d != '':
                 upload('')
@@ -212,4 +215,26 @@ def setup(args):
             continue
         log('deleting %s' % key.name)
         key.delete()
-        # TODO Invalidate cache.
+        invalidations.append(key.name)
+
+    if len(invalidations) == 0:
+        return
+
+    log('invalidating cached copies of changed or deleted files')
+    def invalidate_all(paths):
+        # TODO Handle the error when exceeding the limit, and serialize the
+        # remaining paths so that we can restart later.
+        cf.create_invalidation_request(distribution.id, paths)
+        del paths[:]
+    paths = []
+    def invalidate(path):
+        paths.append(path)
+        if len(paths) == 1000:
+            invalidate_all(paths)
+    for i in invalidations:
+        invalidate('/' + i)
+        if (i == args.index):
+            invalidate('/')
+
+    if len(paths) > 0:
+        invalidate_all(paths)
