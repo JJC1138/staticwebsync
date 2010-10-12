@@ -93,6 +93,11 @@ def setup(args):
         args.host_name, distribution.domain_name))
 
     # TODO Set up custom MIME types.
+    mimetypes.init()
+    # On my Windows system these get set to silly other values by some registry
+    # key, which is, for the avoidance of doubt, super lame.
+    mimetypes.types_map['.png'] = 'image/png'
+    mimetypes.types_map['.jpg'] = 'image/jpeg'
 
     dir = os.path.normpath(args.folder)
 
@@ -112,42 +117,46 @@ def setup(args):
             if d == '.':
                 d = ''
 
-            parts = list(os.path.split(d))
-
-            f = filename
-            if f == args.index:
-                # TODO Upload a copy with the original name too.
-                f = ''
-            parts.append(f)
-            outf = posixpath.join(*parts)
-            if outf == '':
-                outf = args.index
-
-            log('processing "%s" -> "%s"' % (inf, outf))
-
-            key = bucket.get_key(outf)
             local_file = open(inf, 'rb')
-            md5 = None
 
-            if key is not None:
-                log('%s exists in bucket' % outf)
-                md5 = key.compute_md5(local_file)
-                if key.etag == '"%s"' % md5[0]:
-                    log('%s matches local file' % outf)
-                    # TODO Check policy and headers
-                    continue
-            else:
-                key = bucket.new_key(outf)
+            def upload(f):
+                # We could re-use this if uploading same file twice, but the
+                # code would be a bit messy.
+                md5 = None
 
-            type = mimetypes.guess_type(filename, strict=False)
-            headers = {}
-            if type[0] is not None:
-                headers['Content-Type'] = type[0]
-            if type[1] is not None:
-                headers['Content-Encoding'] = type[1]
+                parts = list(os.path.split(d))
+                parts.append(f)
+                outf = posixpath.join(*parts)
+                if outf == '':
+                    outf = args.index
 
-            log('uploading %s' % outf)
-            key.set_contents_from_file(local_file,
-                headers, policy='public-read', md5=md5)
+                log('processing "%s" -> "%s"' % (inf, outf))
+
+                key = bucket.get_key(outf)
+
+                if key is not None:
+                    log('%s exists in bucket' % outf)
+                    md5 = key.compute_md5(local_file)
+                    if key.etag == '"%s"' % md5[0]:
+                        log('%s matches local file' % outf)
+                        # TODO Check policy and headers
+                        return
+                else:
+                    key = bucket.new_key(outf)
+
+                type = mimetypes.guess_type(filename, strict=False)
+                headers = {}
+                if type[0] is not None:
+                    headers['Content-Type'] = type[0]
+                if type[1] is not None:
+                    headers['Content-Encoding'] = type[1]
+
+                log('uploading %s' % outf)
+                key.set_contents_from_file(local_file,
+                    headers, policy='public-read', md5=md5)
+
+            if filename == args.index and d != '':
+                upload('')
+            upload(filename)
 
             local_file.close()
