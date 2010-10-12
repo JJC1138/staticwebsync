@@ -13,6 +13,13 @@ class BadUserError(Exception):
     def __init__(self, message):
         self.message = message
 
+def split_all(s, splitter):
+    out = []
+    while len(s) != 0:
+        s, tail = splitter(s)
+        out.insert(0, tail)
+    return out
+
 def setup(args):
     standard_bucket_name = 'syncfront-' + args.host_name
 
@@ -135,7 +142,7 @@ def setup(args):
                 # the code would be a bit messy.
                 md5 = None
 
-                parts = list(os.path.split(d))
+                parts = list(split_all(d, os.path.split))
                 parts.append(f)
                 outf = posixpath.join(*parts)
                 if outf == '':
@@ -145,7 +152,8 @@ def setup(args):
 
                 key = bucket.get_key(outf)
 
-                if key is not None:
+                existed = key is not None
+                if existed:
                     log('%s exists in bucket' % outf)
                     md5 = key.compute_md5(local_file)
                     if key.etag == '"%s"' % md5[0] and \
@@ -184,9 +192,24 @@ def setup(args):
                 log('uploading %s' % outf)
                 key.set_contents_from_file(local_file,
                     headers, policy='public-read', md5=md5)
+                if existed:
+                    pass # TODO Invalidate cache.
 
             if filename == args.index and d != '':
                 upload('')
             upload(filename)
 
             local_file.close()
+
+    log('checking for changed or deleted files')
+
+    for key in bucket.get_all_keys():
+        name = key.name
+        if name.endswith('/'):
+            name = posixpath.join(name, args.index)
+        if os.path.isfile(os.path.join(*split_all(name, posixpath.split))):
+            log('%s has corresponding local file' % key.name)
+            continue
+        log('deleting %s' % key.name)
+        key.delete()
+        # TODO Invalidate cache.
