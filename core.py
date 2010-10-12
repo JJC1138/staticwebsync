@@ -124,7 +124,17 @@ def setup(args):
     os.chdir(dir)
 
     for (dirpath, dirnames, filenames) in os.walk('.'):
+        if not args.allow_dot_files:
+            dir = os.path.split(dirpath)[1]
+            if dir.startswith('.') and dir != '.':
+                log('Skipping folder %s' % os.path.normpath(dirpath))
+                continue
+
         for filename in filenames:
+            if not args.allow_dot_files and filename.startswith('.'):
+                log('Skipping file %s' % filename)
+                continue
+
             inf = os.path.normpath(os.path.join(dirpath, filename))
 
             d = os.path.normpath(dirpath)
@@ -160,7 +170,8 @@ def setup(args):
                     log('%s exists in bucket' % outf)
                     md5 = key.compute_md5(local_file)
                     if key.etag == '"%s"' % md5[0] and \
-                        key.content_type == headers.get('Content-Type') and \
+                        key.content_type == headers.get(
+                            'Content-Type', key.content_type) and \
                         key.content_encoding == headers.get('Content-Encoding'):
 
                         # TODO Check for other headers?
@@ -210,7 +221,14 @@ def setup(args):
         name = key.name
         if name.endswith('/'):
             name = posixpath.join(name, args.index)
-        if os.path.isfile(os.path.join(*split_all(name, posixpath.split))):
+        parts = split_all(name, posixpath.split)
+        blacklisted = False
+        if not args.allow_dot_files:
+            for p in parts:
+                if p.startswith('.'):
+                    blacklisted = True
+                    break
+        if not blacklisted and os.path.isfile(os.path.join(*parts)):
             log('%s has corresponding local file' % key.name)
             continue
         log('deleting %s' % key.name)
