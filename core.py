@@ -1,6 +1,8 @@
 __all__ = ('log', 'BadUserError', 'setup')
 
+import mimetypes
 import os
+import posixpath
 
 import boto
 import boto.s3.connection
@@ -89,3 +91,63 @@ def setup(args):
 
     log('\nDistribution is ready. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s' % (
         args.host_name, distribution.domain_name))
+
+    # TODO Set up custom MIME types.
+
+    dir = os.path.normpath(args.folder)
+
+    if not os.path.exists(dir):
+        raise BadUserError('Folder %s does not exist.' % args.folder)
+
+    if not os.path.isdir(dir):
+        raise BadUserError('%s is a file not a folder.' % args.folder)
+
+    os.chdir(dir)
+
+    for (dirpath, dirnames, filenames) in os.walk('.'):
+        for filename in filenames:
+            inf = os.path.normpath(os.path.join(dirpath, filename))
+
+            d = os.path.normpath(dirpath)
+            if d == '.':
+                d = ''
+
+            parts = list(os.path.split(d))
+
+            f = filename
+            if f == args.index:
+                # TODO Upload a copy with the original name too.
+                f = ''
+            parts.append(f)
+            outf = posixpath.join(*parts)
+            if outf == '':
+                outf = args.index
+
+            log('processing "%s" -> "%s"' % (inf, outf))
+
+            key = bucket.get_key(outf)
+            local_file = open(inf, 'rb')
+            md5 = None
+
+            if key is not None:
+                log('%s exists in bucket' % outf)
+                md5 = key.compute_md5(local_file)
+                if key.etag == '"%s"' % md5[0]:
+                    log('%s matches local file' % outf)
+                    # TODO Check policy and headers
+                    continue
+            else:
+                key = bucket.new_key(outf)
+
+            type = mimetypes.guess_type(filename, strict=False)
+            headers = {}
+            if type[0] is not None:
+                headers['Content-Type'] = type[0]
+            if type[1] is not None:
+                headers['Content-Encoding'] = type[1]
+
+            log('uploading %s' % outf)
+            key.set_contents_from_file(local_file,
+                headers, policy='public-read', md5=md5)
+
+            local_file.close()
