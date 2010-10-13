@@ -109,6 +109,7 @@ def setup(args):
     # key, which is, for the avoidance of doubt, super lame.
     mimetypes.types_map['.png'] = 'image/png'
     mimetypes.types_map['.jpg'] = 'image/jpeg'
+    mimetypes.types_map['.js'] = 'application/javascript'
 
     # TODO Serialize these in case of failure, and resume when restarting:
     invalidations = []
