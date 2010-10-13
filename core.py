@@ -125,9 +125,13 @@ def setup(args):
 
     for (dirpath, dirnames, filenames) in os.walk('.'):
         if not args.allow_dot_files:
-            dir = os.path.split(dirpath)[1]
-            if dir.startswith('.') and dir != '.':
-                log('Skipping folder %s' % os.path.normpath(dirpath))
+            blacklisted = False
+            for p in split_all(dirpath, os.path.split):
+                if p.startswith('.') and p != '.':
+                    log('Skipping folder %s' % os.path.normpath(dirpath))
+                    blacklisted = True
+                    break
+            if blacklisted:
                 continue
 
         for filename in filenames:
