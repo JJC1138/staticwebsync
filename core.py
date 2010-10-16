@@ -222,7 +222,7 @@ def setup(args):
 
     log('checking for changed or deleted files')
 
-    for key in bucket.get_all_keys():
+    for key in bucket.list():
         name = key.name
         if name.endswith('/'):
             name = posixpath.join(name, args.index)
