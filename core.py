@@ -21,7 +21,7 @@ def split_all(s, splitter):
     return out
 
 def setup(args):
-    standard_bucket_name = 'staticwebsync-' + args.host_name
+    standard_bucket_name = args.host_name
 
     s3 = boto.connect_s3(args.access_key_id, args.secret_access_key)
 
@@ -62,46 +62,59 @@ def setup(args):
     log('configuring bucket ACL policy')
     bucket.set_canned_acl('private')
 
-    cf = boto.connect_cloudfront(args.access_key_id, args.secret_access_key)
-
-    distribution = None
-    all_distributions = None
-    try:
-        log('looking for existing CloudFront distribution')
-        all_distributions = cf.get_all_distributions()
-    except boto.cloudfront.exception.CloudFrontServerError, e:
-        if e.error_code == 'OptInRequired':
-            raise BadUserError('Your AWS account is not signed up for CloudFront, please sign up at http://aws.amazon.com/cloudfront/')
-        else:
-            raise e
-
-    origin = bucket.name + '.s3.amazonaws.com'
-
-    for d in all_distributions:
-        if d.origin == origin:
-            distribution = d.get_distribution()
-            log('found distribution: %s' % distribution.id)
-            break
-        elif args.host_name in d.cnames:
-            # TODO Remove the CNAME if a force option is given.
-            raise BadUserError("Existing distribution %s has this hostname set as a CNAME, but it isn't associated with the correct origin bucket. Please remove the CNAME from the distribution or delete the distribution." % d.id)
+    log('configuring bucket for website access')
+    if args.error_page is not None:
+        bucket.configure_website(args.index, args.error_page)
     else:
-        log('creating CloudFront distribution')
-        distribution = cf.create_distribution(
-            origin=origin, enabled=True)
-        log('created distribution: %s' % distribution.id)
+        bucket.configure_website(args.index)
 
-    log('configuring distribution')
-    distribution.config.origin_access_identity = None
-    distribution.config.trusted_signers = None
-    distribution.update(
-        enabled=True,
-        cnames=[args.host_name],
-        comment='Created by staticwebsync',
-        default_root_object=args.index)
+    use_cloudfront = not args.no_cloudfront
 
-    log('\nDistribution is ready. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s' % (
-        args.host_name, distribution.domain_name))
+    if use_cloudfront:
+        cf = boto.connect_cloudfront(args.access_key_id, args.secret_access_key)
+
+        distribution = None
+        all_distributions = None
+        try:
+            log('looking for existing CloudFront distribution')
+            all_distributions = cf.get_all_distributions()
+        except boto.cloudfront.exception.CloudFrontServerError, e:
+            if e.error_code == 'OptInRequired':
+                raise BadUserError('Your AWS account is not signed up for CloudFront, please sign up at http://aws.amazon.com/cloudfront/')
+            else:
+                raise e
+
+        origin = boto.cloudfront.origin.CustomOrigin(
+            bucket.get_website_endpoint(), origin_protocol_policy='http-only')
+
+        for d in all_distributions:
+            if d.origin.to_xml() == origin.to_xml():
+                distribution = d.get_distribution()
+                log('found distribution: %s' % distribution.id)
+                break
+            elif args.host_name in d.cnames:
+                # TODO Remove the CNAME if a force option is given.
+                raise BadUserError("Existing distribution %s has this hostname set as a CNAME, but it isn't associated with the correct origin bucket. Please remove the CNAME from the distribution or delete the distribution." % d.id)
+        else:
+            log('creating CloudFront distribution')
+            distribution = cf.create_distribution(
+                origin=origin, enabled=True)
+            log('created distribution: %s' % distribution.id)
+
+        log('configuring distribution')
+        distribution.config.origin_access_identity = None
+        distribution.config.trusted_signers = None
+        distribution.update(
+            enabled=True,
+            cnames=[args.host_name],
+            comment='Created by staticwebsync')
+
+        log('\nDistribution is ready. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s' % (
+            args.host_name, distribution.domain_name))
+
+    else:
+        log('\nBucket is ready. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s' % (
+            args.host_name, bucket.get_website_endpoint()))
 
     # TODO Set up custom MIME types.
     mimetypes.init()
@@ -214,8 +227,6 @@ def setup(args):
                 if existed:
                     invalidations.append(key.name)
 
-            if filename == args.index and d != '':
-                upload('')
             upload(filename)
 
             local_file.close()
@@ -240,7 +251,7 @@ def setup(args):
         key.delete()
         invalidations.append(key.name)
 
-    if len(invalidations) == 0:
+    if not use_cloudfront or len(invalidations) == 0:
         return
 
     log('invalidating cached copies of changed or deleted files')

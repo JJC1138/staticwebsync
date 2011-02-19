@@ -18,6 +18,7 @@ arg_parser = argparse.ArgumentParser(
 arg_parser.add_argument('--access-key-id', required=True)
 arg_parser.add_argument('--secret-access-key', required=True)
 arg_parser.add_argument('--index', default='index.html')
+arg_parser.add_argument('--error-page', action='store_true')
 arg_parser.add_argument('--repair', action='store_true')
 arg_parser.add_argument('--allow-dot-files', action='store_true')
 arg_parser.add_argument('--bucket-location', choices = (
@@ -26,6 +27,7 @@ arg_parser.add_argument('--bucket-location', choices = (
     boto.s3.connection.Location.EU,
     'ap-southeast-1'),
     default='US')
+arg_parser.add_argument('--no-cloudfront', action='store_true')
 arg_parser.add_argument('host_name')
 arg_parser.add_argument('folder')
 
