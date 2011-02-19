@@ -13,7 +13,7 @@ core.log = print_log
 DEFAULT_LOCATION = 'US'
 
 arg_parser = argparse.ArgumentParser(
-    description='Sync static files to CloudFront')
+    description='Sync static web sites to Amazon S3 or CloudFront')
 
 arg_parser.add_argument('--access-key-id', required=True)
 arg_parser.add_argument('--secret-access-key', required=True)

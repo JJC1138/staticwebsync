@@ -21,7 +21,7 @@ def split_all(s, splitter):
     return out
 
 def setup(args):
-    standard_bucket_name = 'syncfront-' + args.host_name
+    standard_bucket_name = 'staticwebsync-' + args.host_name
 
     s3 = boto.connect_s3(args.access_key_id, args.secret_access_key)
 
@@ -97,7 +97,7 @@ def setup(args):
     distribution.update(
         enabled=True,
         cnames=[args.host_name],
-        comment='Created by SyncFront',
+        comment='Created by staticwebsync',
         default_root_object=args.index)
 
     log('\nDistribution is ready. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s' % (
