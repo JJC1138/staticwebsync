@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 
 import boto
@@ -15,10 +16,12 @@ DEFAULT_LOCATION = 'US'
 arg_parser = argparse.ArgumentParser(
     description='Sync static web sites to Amazon S3 or CloudFront')
 
-arg_parser.add_argument('--access-key-id', required=True)
-arg_parser.add_argument('--secret-access-key', required=True)
+arg_parser.add_argument('--access-key-id',
+    required=not 'AWS_ACCESS_KEY_ID' in os.environ)
+arg_parser.add_argument('--secret-access-key',
+    required=not 'AWS_SECRET_ACCESS_KEY' in os.environ)
 arg_parser.add_argument('--index', default='index.html')
-arg_parser.add_argument('--error-page')
+arg_parser.add_argument('--error-page', default='4xx.html')
 arg_parser.add_argument('--repair', action='store_true')
 arg_parser.add_argument('--allow-dot-files', action='store_true')
 arg_parser.add_argument('--bucket-location', choices = (
