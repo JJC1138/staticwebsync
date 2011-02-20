@@ -109,13 +109,6 @@ def setup(args):
             cnames=[args.host_name],
             comment='Created by staticwebsync')
 
-        log('\nDistribution is ready. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s' % (
-            args.host_name, distribution.domain_name))
-
-    else:
-        log('\nBucket is ready. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s' % (
-            args.host_name, bucket.get_website_endpoint()))
-
     # TODO Set up custom MIME types.
     mimetypes.init()
     # On my Windows system these get set to silly other values by some registry
@@ -251,7 +244,18 @@ def setup(args):
         key.delete()
         invalidations.append(key.name)
 
-    if not use_cloudfront or len(invalidations) == 0:
+    sync_complete_message = '\nSync complete. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s'
+
+    if not use_cloudfront:
+        log(sync_complete_message % (args.host_name, bucket.get_website_endpoint()))
+        return
+
+    def cf_complete():
+        log(sync_complete_message % (args.host_name, distribution.domain_name))
+        log('\nCloudFront may take up to 15 minutes to reflect any changes.')
+
+    if len(invalidations) == 0:
+        cf_complete()
         return
 
     log('invalidating cached copies of changed or deleted files')
@@ -272,3 +276,5 @@ def setup(args):
 
     if len(paths) > 0:
         invalidate_all(paths)
+
+    cf_complete()
