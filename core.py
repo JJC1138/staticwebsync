@@ -21,6 +21,14 @@ def split_all(s, splitter):
     return out
 
 def setup(args):
+    prefix = 'http://'
+    if args.host_name.startswith(prefix):
+        args.host_name = args.host_name[len(prefix):]
+
+    suffix = '/'
+    if args.host_name.endswith(suffix):
+        args.host_name = args.host_name[:-len(suffix)]
+
     standard_bucket_name = args.host_name
 
     s3 = boto.connect_s3(args.access_key_id, args.secret_access_key)
