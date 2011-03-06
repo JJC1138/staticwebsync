@@ -44,6 +44,8 @@ def setup(args):
         else:
             raise e
 
+    use_cloudfront = not args.no_cloudfront
+
     for b in all_buckets:
         if b.name == standard_bucket_name or \
             b.name.startswith(standard_bucket_name + '-'):
@@ -53,6 +55,7 @@ def setup(args):
             break
     else:
         bucket_name = standard_bucket_name
+        first_fail = True
         while True:
             try:
                 log('creating bucket %s' % bucket_name)
@@ -63,6 +66,11 @@ def setup(args):
                 if e.error_code == 'BucketAlreadyExists':
                     log('bucket %s was already used by another user' %
                         bucket_name)
+                    if first_fail:
+                        log('We can use an alternative bucket name, but this will only work with CloudFront and not with standard S3 web site hosting (because it requires the bucket name to match the host name).')
+                        first_fail = False
+                    if not use_cloudfront:
+                        raise BadUserError("Using CloudFront is disabled, so we can't continue.")
                     bucket_name = \
                         standard_bucket_name + '-' + os.urandom(8).encode('hex')
                     continue
@@ -77,8 +85,6 @@ def setup(args):
         bucket.configure_website(args.index, args.error_page)
     else:
         bucket.configure_website(args.index)
-
-    use_cloudfront = not args.no_cloudfront
 
     if use_cloudfront:
         cf = boto.connect_cloudfront(args.access_key_id, args.secret_access_key)
