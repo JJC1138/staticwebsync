@@ -56,11 +56,13 @@ def setup(args):
         while True:
             try:
                 log('creating bucket %s' % bucket_name)
-                bucket = s3.create_bucket(bucket_name, location=args.bucket_location)
+                bucket = s3.create_bucket(
+                    bucket_name, location=args.bucket_location)
                 break
             except boto.exception.S3CreateError, e:
                 if e.error_code == 'BucketAlreadyExists':
-                    log('bucket %s was already used by another user')
+                    log('bucket %s was already used by another user' %
+                        bucket_name)
                     bucket_name = \
                         standard_bucket_name + '-' + os.urandom(8).encode('hex')
                     continue
