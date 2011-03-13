@@ -280,7 +280,8 @@ def setup(args):
     sync_complete_message = '\nSync complete. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s'
 
     if not use_cloudfront:
-        log(sync_complete_message % (args.host_name, bucket.get_website_endpoint()))
+        log(sync_complete_message % (
+            args.host_name, bucket.get_website_endpoint()))
         return
 
     def cf_complete():
@@ -296,7 +297,10 @@ def setup(args):
         while True:
             log('Checking if CloudFront propagation is complete.')
             d = cf.get_distribution_info(d.id)
-            if d.status != 'InProgress':
+
+            if d.status != 'InProgress' and \
+                d.in_progress_invalidation_batches == 0:
+
                 log('CloudFront propagation is complete.')
                 return
 
