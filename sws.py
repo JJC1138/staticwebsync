@@ -52,6 +52,9 @@ arg_parser.add_argument('--bucket-location', choices = (
 arg_parser.add_argument('--no-cloudfront', action='store_true',
     help="Use this option if you just want your site hosted on S3 and do not want to use CloudFront as well. See the %(prog)s web site for advice about why you might want to do that.")
 
+arg_parser.add_argument('--dont-wait-for-cloudfront-propagation', action='store_true',
+    help="When you change or delete files hosted on CloudFront it takes up to 15 minutes to propagate that change across all CloudFront servers. Normally %(prog)s waits for that to finish before completing so that you know that when it is complete your site is up-to-date, but if you use this option then the program will not wait and just return immediately after it has finished syncing your files.")
+
 arg_parser.add_argument('host_name',
     help="The host name for the site")
 

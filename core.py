@@ -3,6 +3,7 @@ __all__ = ('log', 'BadUserError', 'setup')
 import mimetypes
 import os
 import posixpath
+import time
 
 import boto
 import boto.s3.connection
@@ -103,6 +104,7 @@ def setup(args):
         origin = boto.cloudfront.origin.CustomOrigin(
             bucket.get_website_endpoint(), origin_protocol_policy='http-only')
 
+        created_new_distribution = False
         for d in all_distributions:
             if d.origin.to_xml() == origin.to_xml():
                 distribution = d.get_distribution()
@@ -116,14 +118,29 @@ def setup(args):
             distribution = cf.create_distribution(
                 origin=origin, enabled=True)
             log('created distribution: %s' % distribution.id)
+            created_new_distribution = True
 
-        log('configuring distribution')
-        distribution.config.origin_access_identity = None
-        distribution.config.trusted_signers = None
-        distribution.update(
-            enabled=True,
-            cnames=[args.host_name],
-            comment='Created by staticwebsync')
+        if not created_new_distribution:
+            log('checking distribution configuration')
+            distribution = cf.get_distribution_info(distribution.id)
+
+        if created_new_distribution or \
+            getattr(distribution.config, 'origin_access_identity', None) \
+                is not None or \
+            distribution.config.trusted_signers is not None or \
+            (not distribution.config.enabled) or \
+            args.host_name not in distribution.config.cnames:
+
+            log('configuring distribution')
+
+            distribution.config.origin_access_identity = None
+            distribution.config.trusted_signers = None
+            distribution.update(
+                enabled=True,
+                cnames=[args.host_name],
+                comment='Created by staticwebsync')
+        else:
+            log('distribution configuration already fine')
 
     # TODO Set up custom MIME types.
     mimetypes.init()
@@ -268,7 +285,25 @@ def setup(args):
 
     def cf_complete():
         log(sync_complete_message % (args.host_name, distribution.domain_name))
-        log('\nCloudFront may take up to 15 minutes to reflect any changes.')
+
+        if (args.dont_wait_for_cloudfront_propagation):
+            log('\nCloudFront may take up to 15 minutes to reflect any changes.')
+            return
+
+        log('')
+
+        d = distribution
+        while True:
+            log('Checking if CloudFront propagation is complete.')
+            d = cf.get_distribution_info(d.id)
+            if d.status != 'InProgress':
+                log('CloudFront propagation is complete.')
+                return
+
+            interval = 15
+            log('Propagation still in progress; checking again in %d seconds.' %
+                interval)
+            time.sleep(interval)
 
     if len(invalidations) == 0:
         cf_complete()
