@@ -13,6 +13,9 @@ core.log = print_log
 
 DEFAULT_LOCATION = 'US'
 
+if len(sys.argv) == 1:
+    sys.argv.append('-h')
+
 arg_parser = argparse.ArgumentParser(
     description="%(prog)s is a command-line tool for automating the fiddly aspects of hosting your static web site on Amazon S3 or CloudFront. It automates the process of configuring the services for hosting web sites, and synchronizes the contents of a local folder to the site. WARNING: The sync is a one-way sync so if you have an S3 bucket with the host name of the site already then any files it contains that do not have a corresponding local file will be DELETED from the bucket (if that doesn't mean anything to you and you've not used S3 before then you don't need to worry about it).")
 
