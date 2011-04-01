@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 import sys
 
 extra_options = {}
@@ -6,7 +6,7 @@ if 'py2exe' in sys.argv:
     from glob import glob
     import py2exe
     extra_options.update(
-        console=['bin/sws.py'],
+        console=['staticwebsync/sws.py'],
         zipfile=None,
         options={'py2exe': {
             'bundle_files': 1,
@@ -27,10 +27,12 @@ setup(
     maintainer='Jon Colverson',
     maintainer_email='staticwebsync@jjc1138.net',
     packages=['staticwebsync'],
-    scripts=['bin/sws.py'],
     url='http://staticwebsync.com/',
     license='MIT',
     description='Automates setting up S3/CloudFront for web site hosting',
     long_description=open('README.txt').read(),
+
+    entry_points = { 'console_scripts': [ 'sws = staticwebsync.sws.main' ] },
+
     **extra_options
 )
