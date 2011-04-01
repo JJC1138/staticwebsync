@@ -4,12 +4,12 @@ import sys
 
 import boto
 
-import core
+import staticwebsync
 
 def print_log(message):
     print message
 
-core.log = print_log
+staticwebsync.log = print_log
 
 DEFAULT_LOCATION = 'US'
 
@@ -70,7 +70,7 @@ if args.bucket_location == DEFAULT_LOCATION:
     args.bucket_location = ''
 
 try:
-    core.setup(args)
-except core.BadUserError, e:
+    staticwebsync.setup(args)
+except staticwebsync.BadUserError, e:
     print >>sys.stderr, e.message
     sys.exit(1)
