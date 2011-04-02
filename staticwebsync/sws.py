@@ -11,8 +11,24 @@ import staticwebsync
 def print_log(message):
     print message
 
+def progress(done, doing):
+    bar_width = 50
+    prefix = '['
+    postfix = ']'
+    total_width = len(prefix) + len(postfix) + bar_width
+    progress = float(done) / doing
+    bars = int(progress * bar_width)
+    spaces = bar_width - bars
+
+    print '\r' + prefix + ('#' * bars) + (' ' * spaces) + postfix,
+
+    if done == doing:
+        print '\r' + (' ' * total_width) + '\r',
+
 def main():
     staticwebsync.log = print_log
+    staticwebsync.progress_callback = progress
+    staticwebsync.progress_callback_divisions = 50
 
     DEFAULT_LOCATION = 'US'
 

@@ -1,4 +1,5 @@
-__all__ = ('log', 'BadUserError', 'setup')
+__all__ = ('log', 'progress_callback', 'progress_callback_divisions',
+    'BadUserError', 'setup')
 
 import mimetypes
 import os
@@ -9,6 +10,8 @@ import boto
 import boto.s3.connection
 
 log = None
+progress_callback = None
+progress_callback_divisions = 10
 
 MARKER_KEY_NAME = '.staticwebsync'
 
@@ -261,7 +264,8 @@ def setup(args):
 
                 log('uploading %s' % outf)
                 key.set_contents_from_file(local_file,
-                    headers, policy='public-read', md5=md5)
+                    headers, policy='public-read', md5=md5,
+                    cb=progress_callback, num_cb=progress_callback_divisions)
                 if existed:
                     invalidations.append(key.name)
 
