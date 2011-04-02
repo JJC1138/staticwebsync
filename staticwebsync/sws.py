@@ -34,8 +34,9 @@ class progress_reporter:
 
 def main():
     staticwebsync.log = print_log
-    staticwebsync.progress_callback_factory = progress_reporter
-    staticwebsync.progress_callback_divisions = 50
+    if sys.stdout.isatty():
+        staticwebsync.progress_callback_factory = progress_reporter
+        staticwebsync.progress_callback_divisions = 50
 
     DEFAULT_LOCATION = 'US'
 
