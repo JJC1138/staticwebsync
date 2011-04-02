@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+import time
 
 import boto
 
@@ -11,23 +12,29 @@ import staticwebsync
 def print_log(message):
     print message
 
-def progress(done, doing):
-    bar_width = 50
-    prefix = '['
-    postfix = ']'
-    total_width = len(prefix) + len(postfix) + bar_width
-    progress = float(done) / doing
-    bars = int(progress * bar_width)
-    spaces = bar_width - bars
+class progress_reporter:
 
-    print '\r' + prefix + ('#' * bars) + (' ' * spaces) + postfix,
+    def __init__(self):
+        self.start_time = time.time()
 
-    if done == doing:
-        print '\r' + (' ' * total_width) + '\r',
+    def __call__(self, done, doing):
+        progress = float(done) / doing
+        kbytesps = (done / (time.time() - self.start_time)) / 1024
+
+        bar_width = 50
+        bars = int(progress * bar_width)
+        spaces = bar_width - bars
+
+        print '\r' + \
+            '[' + ('#' * bars) + (' ' * spaces) + ']' + \
+            (' %d kB/s' % kbytesps),
+
+        if done == doing:
+            print '\r' + (' ' * 80) + '\r',
 
 def main():
     staticwebsync.log = print_log
-    staticwebsync.progress_callback = progress
+    staticwebsync.progress_callback_factory = progress_reporter
     staticwebsync.progress_callback_divisions = 50
 
     DEFAULT_LOCATION = 'US'

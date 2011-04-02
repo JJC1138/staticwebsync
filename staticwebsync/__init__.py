@@ -10,7 +10,7 @@ import boto
 import boto.s3.connection
 
 log = None
-progress_callback = None
+progress_callback_factory = lambda: None
 progress_callback_divisions = 10
 
 MARKER_KEY_NAME = '.staticwebsync'
@@ -265,7 +265,8 @@ def setup(args):
                 log('uploading %s' % outf)
                 key.set_contents_from_file(local_file,
                     headers, policy='public-read', md5=md5,
-                    cb=progress_callback, num_cb=progress_callback_divisions)
+                    cb=progress_callback_factory(),
+                    num_cb=progress_callback_divisions)
                 if existed:
                     invalidations.append(key.name)
 
