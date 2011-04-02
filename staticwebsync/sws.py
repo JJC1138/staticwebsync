@@ -20,7 +20,7 @@ def main():
         sys.argv.append('-h')
 
     arg_parser = argparse.ArgumentParser(
-        description="%(prog)s is a command-line tool for automating the fiddly aspects of hosting your static web site on Amazon S3 or CloudFront. It automates the process of configuring the services for hosting web sites, and synchronizes the contents of a local folder to the site. WARNING: The sync is a one-way sync so if you have an S3 bucket with the host name of the site already then any files it contains that do not have a corresponding local file will be DELETED from the bucket (if that doesn't mean anything to you and you've not used S3 before then you don't need to worry about it).")
+        description="%(prog)s is a command-line tool for automating the fiddly aspects of hosting your static web site on Amazon S3 or CloudFront. It automates the process of configuring the services for hosting web sites, and synchronizes the contents of a local folder to the site.")
 
     def help_text_with_default(text, default=None):
         return '%s [default: %s]' % (text, default if default is not None else '%(default)s')
@@ -60,6 +60,9 @@ def main():
 
     arg_parser.add_argument('--dont-wait-for-cloudfront-propagation', action='store_true',
         help="When you change or delete files hosted on CloudFront it takes up to 15 minutes to propagate that change across all CloudFront servers. Normally %(prog)s waits for that to finish before completing so that you know that when it is complete your site is up-to-date, but if you use this option then the program will not wait and just return immediately after it has finished syncing your files.")
+
+    arg_parser.add_argument('--take-over-existing-bucket', action='store_true',
+        help="%(prog)s uses an S3 bucket with the same name as the host name for the site. If it finds such a bucket that it didn't create itself then it will normally refuse to sync. This is a safety precaution: %(prog)s does one-way syncing of files, so it deletes anything in the bucket that doesn't have a corresponding local file. If the bucket existed already then there might be files in it that you care about, so %(prog)s plays it safe and refuses to use such a bucket. If you use this option then %(prog)s will treat the bucket as if it created it, and will put a marker key in the bucket to signify that so this option only needs to be used on the first sync.")
 
     arg_parser.add_argument('host_name',
         help="The host name for the site")

@@ -10,6 +10,8 @@ import boto.s3.connection
 
 log = None
 
+MARKER_KEY_NAME = '.staticwebsync'
+
 class BadUserError(Exception):
     def __init__(self, message):
         self.message = message
@@ -46,6 +48,9 @@ def setup(args):
             raise e
 
     use_cloudfront = not args.no_cloudfront
+    def install_marker_key(bucket):
+        bucket.new_key(MARKER_KEY_NAME).set_contents_from_string(
+            '', policy='private')
 
     for b in all_buckets:
         if b.name == standard_bucket_name or \
@@ -53,6 +58,13 @@ def setup(args):
 
             bucket = b
             log('found existing bucket %s' % bucket.name)
+
+            if not MARKER_KEY_NAME in b:
+                if not args.take_over_existing_bucket:
+                    raise BadUserError("The S3 bucket %s already exists, but was not created by staticwebsync. If you wish to use it anyway and are happy for any existing files in it to be deleted if they don't have a corresponding local file then use the --take-over-existing-bucket option." % bucket.name)
+
+                install_marker_key(bucket)
+
             break
     else:
         bucket_name = standard_bucket_name
@@ -62,6 +74,7 @@ def setup(args):
                 log('creating bucket %s' % bucket_name)
                 bucket = s3.create_bucket(
                     bucket_name, location=args.bucket_location)
+                install_marker_key(bucket)
                 break
             except boto.exception.S3CreateError, e:
                 if e.error_code == 'BucketAlreadyExists':
@@ -137,8 +150,7 @@ def setup(args):
             distribution.config.trusted_signers = None
             distribution.update(
                 enabled=True,
-                cnames=[args.host_name],
-                comment='Created by staticwebsync')
+                cnames=[args.host_name])
         else:
             log('distribution configuration already fine')
 
@@ -261,6 +273,8 @@ def setup(args):
 
     for key in bucket.list():
         name = key.name
+        if name == MARKER_KEY_NAME:
+            continue
         if name.endswith('/'):
             name = posixpath.join(name, args.index)
         parts = split_all(name, posixpath.split)
