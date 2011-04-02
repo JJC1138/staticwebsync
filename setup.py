@@ -32,7 +32,8 @@ setup(
     description='Automates setting up S3/CloudFront for web site hosting',
     long_description=open('README.txt').read(),
 
-    entry_points = { 'console_scripts': [ 'sws = staticwebsync.sws.main' ] },
+    entry_points = {'console_scripts': ['sws = staticwebsync.sws:main']},
+    install_requires = ['boto > 2.0b4'],
 
     **extra_options
 )
