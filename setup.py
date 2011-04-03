@@ -27,6 +27,7 @@ if 'py2app' in sys.argv:
         app=['staticwebsync/sws.py'],
         options={'py2app': {
             'packages': ['email'],
+            'no_chdir': True,
         }},
     )
 
