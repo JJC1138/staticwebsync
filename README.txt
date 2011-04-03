@@ -23,16 +23,16 @@ http://docs.python.org/license.html
 boto, which is:
 Copyright © 2006-2011 Mitch Garnaat http://garnaat.org/
 Copyright © 2010-2011 Eucalyptus Systems, Inc.
-and also distributed under the above license.
+and also distributed under the above MIT license.
 
 and either:
 
 py2app, which is:
 Copyright © 2004-2006 Bob Ippolito
-and distributed under the above license.
+and distributed under the above MIT license.
 
 or:
 
 py2exe, which is:
 Copyright © 2000-2008 Thomas Heller, Mark Hammond, Jimmy Retzlaff
-and distributed under the above license.
+and distributed under the above MIT license.
