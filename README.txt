@@ -13,9 +13,26 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-Binary versions include the boto library, which is:
+Binary versions also include:
 
+Python, which is:
+Copyright © 2001-2010 Python Software Foundation; All Rights Reserved
+and distributed under the licenses at:
+http://docs.python.org/license.html
+
+boto, which is:
 Copyright © 2006-2011 Mitch Garnaat http://garnaat.org/
 Copyright © 2010-2011 Eucalyptus Systems, Inc.
+and also distributed under the above license.
 
-and also distributed subject to the above license.
+and either:
+
+py2app, which is:
+Copyright © 2004-2006 Bob Ippolito
+and distributed under the above license.
+
+or:
+
+py2exe, which is:
+Copyright © 2000-2008 Thomas Heller, Mark Hammond, Jimmy Retzlaff
+and distributed under the above license.
