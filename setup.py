@@ -21,6 +21,15 @@ if 'py2exe' in sys.argv:
             r'C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\redist\x86\Microsoft.VC90.CRT\*.*'))],
     )
 
+if 'py2app' in sys.argv:
+    extra_options.update(
+        setup_requires=['py2app'],
+        app=['staticwebsync/sws.py'],
+        options={'py2app': {
+            'packages': ['email'],
+        }},
+    )
+
 setup(
     name='staticwebsync',
     version='1.0.0dev',
