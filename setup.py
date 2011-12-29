@@ -37,7 +37,7 @@ setup(
     maintainer='Jon Colverson',
     maintainer_email='staticwebsync@jjc1138.net',
     packages=['staticwebsync'],
-    url='http://staticwebsync.com/',
+    url='http://staticwebsync.jjc1138.net/',
     license='MIT',
     description='Automates setting up S3/CloudFront for web site hosting',
     long_description=open('README.txt').read(),
