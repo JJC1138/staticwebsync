@@ -4,6 +4,7 @@ __all__ = ('log', 'progress_callback', 'progress_callback_divisions',
 import mimetypes
 import os
 import posixpath
+import re
 import time
 
 import boto
@@ -36,6 +37,8 @@ def setup(args):
         args.host_name = args.host_name[:-len(suffix)]
 
     standard_bucket_name = args.host_name
+
+    is_index_key = re.compile('(?P<path>^|.*?/)%s$' % re.escape(args.index))
 
     s3 = boto.connect_s3(args.access_key_id, args.secret_access_key)
 
@@ -268,7 +271,13 @@ def setup(args):
                     cb=progress_callback_factory(),
                     num_cb=progress_callback_divisions)
                 if existed:
-                    invalidations.append(key.name)
+                    key_name = key.name
+                    invalidations.append(key_name)
+
+                    # Index pages are likely to be cached in CloudFront without the trailing filename instead (or as well).
+                    m = is_index_key.match(key_name)
+                    if m:
+                        invalidations.append(m.group('path'))
 
             upload(filename)
 
