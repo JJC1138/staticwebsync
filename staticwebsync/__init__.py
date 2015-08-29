@@ -40,7 +40,11 @@ def setup(args):
 
     is_index_key = re.compile('(?P<path>^|.*?/)%s$' % re.escape(args.index))
 
-    s3 = boto.connect_s3(args.access_key_id, args.secret_access_key)
+    # The calling format is needed to address a problem with certificate
+    # validation on bucket names with dots:
+    # https://github.com/boto/boto/issues/2836
+    s3 = boto.connect_s3(args.access_key_id, args.secret_access_key,
+        calling_format=boto.s3.connection.OrdinaryCallingFormat()))
 
     bucket = None
     all_buckets = None
