@@ -33,7 +33,7 @@ if 'py2app' in sys.argv:
 
 setup(
     name='staticwebsync',
-    version='1.0.1',
+    version='1.0.2',
     maintainer='Jon Colverson',
     maintainer_email='staticwebsync@jjc1138.net',
     packages=['staticwebsync'],
