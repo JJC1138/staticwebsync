@@ -44,7 +44,7 @@ def setup(args):
     # validation on bucket names with dots:
     # https://github.com/boto/boto/issues/2836
     s3 = boto.connect_s3(args.access_key_id, args.secret_access_key,
-        calling_format=boto.s3.connection.OrdinaryCallingFormat()))
+        calling_format=boto.s3.connection.OrdinaryCallingFormat())
 
     bucket = None
     all_buckets = None
