@@ -27,10 +27,10 @@ class progress_reporter:
 
         print('\r' + \
             '[' + ('#' * bars) + (' ' * spaces) + ']' + \
-            (' %d kB/s' % kbytesps), end=' ')
+            (' %d kB/s' % kbytesps), end='')
 
         if done == doing:
-            print('\r' + (' ' * 80) + '\r', end=' ')
+            print('\r' + (' ' * 80), end='\r')
 
 def main():
     staticwebsync.log = print_log
