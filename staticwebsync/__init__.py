@@ -309,7 +309,7 @@ def setup(args):
         key.delete()
         invalidations.append(key.name)
 
-    sync_complete_message = '\nsync complete\na DNS CNAME entry needs to be set for\n%s\npointing to\n%s'
+    sync_complete_message = '\nsync complete\na DNS entry needs to be set for\n%s\npointing to\n%s'
 
     if not use_cloudfront:
         log(sync_complete_message % (
