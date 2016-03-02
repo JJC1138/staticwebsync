@@ -51,7 +51,7 @@ def setup(args):
     try:
         log('looking for existing S3 bucket')
         all_buckets = s3.get_all_buckets()
-    except boto.exception.S3ResponseError, e:
+    except boto.exception.S3ResponseError as e:
         if e.status == 403:
             raise BadUserError('Access denied. Please check your AWS Access Key ID and Secret Access Key.')
         else:
@@ -86,7 +86,7 @@ def setup(args):
                     bucket_name, location=args.bucket_location)
                 install_marker_key(bucket)
                 break
-            except boto.exception.S3CreateError, e:
+            except boto.exception.S3CreateError as e:
                 if e.error_code == 'BucketAlreadyExists':
                     log('bucket %s was already used by another user' %
                         bucket_name)
@@ -118,7 +118,7 @@ def setup(args):
         try:
             log('looking for existing CloudFront distribution')
             all_distributions = cf.get_all_distributions()
-        except boto.cloudfront.exception.CloudFrontServerError, e:
+        except boto.cloudfront.exception.CloudFrontServerError as e:
             if e.error_code == 'OptInRequired':
                 raise BadUserError('Your AWS account is not signed up for CloudFront, please sign up at http://aws.amazon.com/cloudfront/')
             else:

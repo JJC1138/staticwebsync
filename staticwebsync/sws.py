@@ -10,7 +10,7 @@ import boto
 import staticwebsync
 
 def print_log(message):
-    print message
+    print(message)
 
 class progress_reporter:
 
@@ -25,12 +25,12 @@ class progress_reporter:
         bars = int(progress * bar_width)
         spaces = bar_width - bars
 
-        print '\r' + \
+        print('\r' + \
             '[' + ('#' * bars) + (' ' * spaces) + ']' + \
-            (' %d kB/s' % kbytesps),
+            (' %d kB/s' % kbytesps), end=' ')
 
         if done == doing:
-            print '\r' + (' ' * 80) + '\r',
+            print('\r' + (' ' * 80) + '\r', end=' ')
 
 def main():
     staticwebsync.log = print_log
@@ -101,8 +101,8 @@ def main():
 
     try:
         staticwebsync.setup(args)
-    except staticwebsync.BadUserError, e:
-        print >>sys.stderr, e.message
+    except staticwebsync.BadUserError as e:
+        print(e.message, file=sys.stderr)
         sys.exit(1)
 
 if __name__ == '__main__':
