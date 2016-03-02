@@ -190,7 +190,7 @@ def setup(args):
             blacklisted = False
             for p in split_all(dirpath, os.path.split):
                 if p.startswith('.') and p != '.':
-                    log('Skipping folder %s' % os.path.normpath(dirpath))
+                    log('skipping folder %s' % os.path.normpath(dirpath))
                     blacklisted = True
                     break
             if blacklisted:
@@ -198,7 +198,7 @@ def setup(args):
 
         for filename in filenames:
             if not args.allow_dot_files and filename.startswith('.'):
-                log('Skipping file %s' % filename)
+                log('skipping file %s' % filename)
                 continue
 
             inf = os.path.normpath(os.path.join(dirpath, filename))
@@ -309,7 +309,7 @@ def setup(args):
         key.delete()
         invalidations.append(key.name)
 
-    sync_complete_message = '\nSync complete. A DNS CNAME entry needs to be set for\n%s\npointing to\n%s'
+    sync_complete_message = '\nsync complete\na DNS CNAME entry needs to be set for\n%s\npointing to\n%s'
 
     if not use_cloudfront:
         log(sync_complete_message % (
@@ -320,24 +320,24 @@ def setup(args):
         log(sync_complete_message % (args.host_name, distribution.domain_name))
 
         if (args.dont_wait_for_cloudfront_propagation):
-            log('\nCloudFront may take up to 15 minutes to reflect any changes.')
+            log('\nCloudFront may take up to 15 minutes to reflect any changes')
             return
 
         log('')
 
         d = distribution
         while True:
-            log('Checking if CloudFront propagation is complete.')
+            log('checking if CloudFront propagation is complete')
             d = cf.get_distribution_info(d.id)
 
             if d.status != 'InProgress' and \
                 d.in_progress_invalidation_batches == 0:
 
-                log('CloudFront propagation is complete.')
+                log('CloudFront propagation is complete')
                 return
 
             interval = 15
-            log('Propagation still in progress; checking again in %d seconds.' %
+            log('propagation still in progress; checking again in %d seconds' %
                 interval)
             time.sleep(interval)
 
