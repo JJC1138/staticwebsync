@@ -38,7 +38,7 @@ def main():
         staticwebsync.progress_callback_factory = progress_reporter
         staticwebsync.progress_callback_divisions = 50
 
-    DEFAULT_LOCATION = 'US'
+    DEFAULT_LOCATION = 'us-east-1'
 
     if len(sys.argv) == 1:
         sys.argv.append('-h')
@@ -72,11 +72,18 @@ def main():
         help="Normally %(prog)s skips files and folders that start with a '.' because those are often used by tools like version control systems for internal data. Use this option to force such files to be uploaded to the web site.")
 
     arg_parser.add_argument('--bucket-location', choices = (
+        'US',
         DEFAULT_LOCATION,
-        boto.s3.connection.Location.USWest,
-        boto.s3.connection.Location.EU,
-        'ap-southeast-1'),
-        default='US',
+        'us-west-1',
+        'us-west-2',
+        'eu-west-1',
+        'eu-central-1',
+        'ap-southeast-1'
+        'ap-southeast-2',
+        'ap-northeast-1',
+        'ap-northeast-2',
+        'sa-east-1'),
+        default=DEFAULT_LOCATION,
         help=help_text_with_default("The location that will be used for any new S3 buckets created. This doesn't have any effect if the bucket for the web site already exists, but in a future version this might give an error if it doesn't match the location of the existing bucket."))
 
     arg_parser.add_argument('--no-cloudfront', action='store_true',

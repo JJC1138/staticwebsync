@@ -1,14 +1,16 @@
 __all__ = ('log', 'progress_callback', 'progress_callback_divisions',
     'BadUserError', 'setup')
 
+import binascii
 import mimetypes
 import os
 import posixpath
 import re
+import sys # FIXME remove
 import time
 
-import boto
-import boto.s3.connection
+import boto3
+import botocore
 
 log = None
 progress_callback_factory = lambda: None
@@ -40,36 +42,63 @@ def setup(args):
 
     is_index_key = re.compile('(?P<path>^|.*?/)%s$' % re.escape(args.index))
 
-    # The calling format is needed to address a problem with certificate
-    # validation on bucket names with dots:
-    # https://github.com/boto/boto/issues/2836
-    s3 = boto.connect_s3(args.access_key_id, args.secret_access_key,
-        calling_format=boto.s3.connection.OrdinaryCallingFormat())
+    s3 = boto3.resource('s3',
+        aws_access_key_id=args.access_key_id,
+        aws_secret_access_key=args.secret_access_key)
 
     bucket = None
+    region = None
     all_buckets = None
     try:
         log('looking for existing S3 bucket')
-        all_buckets = s3.get_all_buckets()
-    except boto.exception.S3ResponseError as e:
-        if e.status == 403:
-            raise BadUserError('Access denied. Please check your AWS Access Key ID and Secret Access Key.')
+        all_buckets = list(s3.buckets.all())
+    except botocore.exceptions.ClientError as e:
+        if e.response['ResponseMetadata']['HTTPStatusCode'] == 403:
+            raise BadUserError('Access denied: %s' % e.response['Error']['Message'])
         else:
             raise e
 
     use_cloudfront = not args.no_cloudfront
+
     def install_marker_key(bucket):
-        bucket.new_key(MARKER_KEY_NAME).set_contents_from_string(
-            '', policy='private')
+        s3.Object(bucket.name, MARKER_KEY_NAME).put(Body=b'', ACL='private')
+
+    def object_or_none(bucket, key):
+        try:
+            o = s3.Object(bucket.name, key)
+            o.load()
+            return o
+        except botocore.exceptions.ClientError as e:
+            if e.response['ResponseMetadata']['HTTPStatusCode'] == 404:
+                return None
+            else:
+                raise e
 
     for b in all_buckets:
         if b.name == standard_bucket_name or \
             b.name.startswith(standard_bucket_name + '-'):
 
-            bucket = b
-            log('found existing bucket %s' % bucket.name)
+            log('found existing bucket %s' % b.name)
 
-            if not MARKER_KEY_NAME in b:
+            # The bucket location must be set in boto so that it can use the
+            # path addressing style:
+            # http://boto3.readthedocs.org/en/latest/guide/s3.html?highlight=botocore.client.Config#changing-the-addressing-style
+            # That's required because otherwise requests on buckets with dots
+            # in their names fail HTTPS validation:
+            # https://github.com/boto/boto/issues/2836
+            region = s3.meta.client.get_bucket_location(
+                Bucket=b.name)['LocationConstraint']
+
+            # That API returns None when the region is us-east-1:
+            # http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGETlocation.html
+            if region is None: region = 'us-east-1'
+
+            s3 = boto3.resource('s3', region_name=region,
+                aws_access_key_id=args.access_key_id,
+                aws_secret_access_key=args.secret_access_key)
+            bucket = s3.Bucket(b.name)
+
+            if not object_or_none(b, MARKER_KEY_NAME):
                 if not args.take_over_existing_bucket:
                     raise BadUserError("The S3 bucket %s already exists, but was not created by staticwebsync. If you wish to use it anyway and are happy for any existing files in it to be deleted if they don't have a corresponding local file then use the --take-over-existing-bucket option." % bucket.name)
 
@@ -82,12 +111,29 @@ def setup(args):
         while True:
             try:
                 log('creating bucket %s' % bucket_name)
-                bucket = s3.create_bucket(
-                    bucket_name, location=args.bucket_location)
+
+                configuration = None
+
+                region = args.bucket_location
+                if not region or region == 'US': region = 'us-east-1'
+
+                if region != 'us-east-1':
+                    configuration = { 'LocationConstraint': region }
+
+                s3 = boto3.resource('s3', region_name=region,
+                    aws_access_key_id=args.access_key_id,
+                    aws_secret_access_key=args.secret_access_key)
+                if configuration:
+                    bucket = s3.create_bucket(
+                        Bucket=bucket_name, CreateBucketConfiguration=configuration)
+                else:
+                    bucket = s3.create_bucket(
+                        Bucket=bucket_name)
+
                 install_marker_key(bucket)
                 break
-            except boto.exception.S3CreateError as e:
-                if e.error_code == 'BucketAlreadyExists':
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error']['Code'] == 'BucketAlreadyExists':
                     log('bucket %s was already used by another user' %
                         bucket_name)
                     if first_fail:
@@ -96,73 +142,165 @@ def setup(args):
                     if not use_cloudfront:
                         raise BadUserError("Using CloudFront is disabled, so we can't continue.")
                     bucket_name = \
-                        standard_bucket_name + '-' + os.urandom(8).encode('hex')
+                        standard_bucket_name + \
+                        '-' + binascii.b2a_hex(os.urandom(8)).decode('ascii')
                     continue
                 else:
                     raise e
 
     log('configuring bucket ACL policy')
-    bucket.set_canned_acl('private')
+    bucket.Acl().put(ACL='private')
 
     log('configuring bucket for website access')
+    website_configuration = { 'IndexDocument': { 'Suffix': args.index } }
     if args.error_page is not None:
-        bucket.configure_website(args.index, args.error_page)
-    else:
-        bucket.configure_website(args.index)
+        website_configuration['ErrorDocument'] = { 'Key': args.error_page }
+    bucket.Website().put(WebsiteConfiguration=website_configuration)
 
     if use_cloudfront:
-        cf = boto.connect_cloudfront(args.access_key_id, args.secret_access_key)
+        cf = boto3.client('cloudfront',
+            aws_access_key_id=args.access_key_id,
+            aws_secret_access_key=args.secret_access_key)
 
         distribution = None
-        all_distributions = None
+        all_distributions = []
         try:
             log('looking for existing CloudFront distribution')
-            all_distributions = cf.get_all_distributions()
-        except boto.cloudfront.exception.CloudFrontServerError as e:
-            if e.error_code == 'OptInRequired':
+            distribution_lists = \
+                list(cf.get_paginator('list_distributions').paginate())
+            for distribution_list in distribution_lists:
+                all_distributions.extend(distribution_list['DistributionList'].get('Items', []))
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'OptInRequired':
                 raise BadUserError('Your AWS account is not signed up for CloudFront, please sign up at http://aws.amazon.com/cloudfront/')
             else:
                 raise e
 
-        origin = boto.cloudfront.origin.CustomOrigin(
-            bucket.get_website_endpoint(), origin_protocol_policy='http-only')
+        # http://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteEndpoints.html
+        website_endpoint = '%s.s3-website-%s.amazonaws.com' % (bucket.name, region)
+
+        def set_required_config(config):
+            any_changed = False
+
+            def get_or_set_default(d, k, default):
+                nonlocal any_changed
+
+                value = d.get(k)
+                if value is None:
+                    any_changed = True
+                    d[k] = default
+                    return default
+                return value
+
+            def set_if_not_equal(d, k, value):
+                nonlocal any_changed
+
+                old_value = d.get(k)
+                if old_value != value:
+                    any_changed = True
+                    d[k] = value
+
+            aliases = get_or_set_default(config, 'Aliases', {})
+            aliases_items = get_or_set_default(aliases, 'Items', [])
+            if args.host_name not in aliases_items:
+                any_changed = True
+                aliases_items.append(args.host_name)
+                aliases['Quantity'] = len(aliases_items)
+
+            origins = get_or_set_default(config, 'Origins', {})
+            origins_items = get_or_set_default(origins, 'Items', [])
+            if len(origins_items) == 0:
+                any_changed = True
+                origin = {}
+                origins_items[:] = [origin]
+            elif len(origins_items) == 1:
+                origin = origins_items[0]
+            else:
+                raise BadUserError("The existing distribution has multiple origins, and we can't configure distributions with more than one. Please delete all but the default origin or delete the distribution.")
+
+            set_if_not_equal(origins, 'Quantity', len(origins_items))
+
+            set_if_not_equal(origin, 'DomainName', website_endpoint)
+            set_if_not_equal(origin, 'Id', 'S3 Website')
+
+            custom_origin_config = get_or_set_default(origin, 'CustomOriginConfig', {})
+            set_if_not_equal(custom_origin_config, 'OriginProtocolPolicy', 'http-only')
+            set_if_not_equal(custom_origin_config, 'HTTPPort', 80)
+            set_if_not_equal(custom_origin_config, 'HTTPSPort', 443)
+
+            default_cache_behavior = get_or_set_default(config, 'DefaultCacheBehavior', {})
+            set_if_not_equal(default_cache_behavior, 'Compress', True)
+            set_if_not_equal(default_cache_behavior, 'TargetOriginId', origin['Id'])
+            forwarded_values = get_or_set_default(default_cache_behavior, 'ForwardedValues', {})
+            set_if_not_equal(forwarded_values, 'QueryString', False)
+            cookies = get_or_set_default(forwarded_values, 'Cookies', {})
+            if cookies.get('Forward') != 'none':
+                any_changed = True
+                cookies.clear()
+                cookies['Forward'] = 'none'
+
+            set_if_not_equal(config, 'Enabled', True)
+
+            return any_changed
+
+        def set_caller_reference(options):
+            options['CallerReference'] = binascii.b2a_hex(os.urandom(8)).decode('ascii')
 
         created_new_distribution = False
         for d in all_distributions:
-            if d.origin.to_xml() == origin.to_xml():
-                distribution = d.get_distribution()
-                log('found distribution: %s' % distribution.id)
-                break
-            elif args.host_name in d.cnames:
-                # TODO Remove the CNAME if a force option is given.
-                raise BadUserError("Existing distribution %s has this hostname set as a CNAME, but it isn't associated with the correct origin bucket. Please remove the CNAME from the distribution or delete the distribution." % d.id)
+            origins = d['Origins'].get('Items', [])
+            if len(origins) == 1:
+                origin = origins[0]
+
+                if origin['DomainName'] == website_endpoint:
+                    distribution = d
+                    log('found distribution: %s' % d['Id'])
+                    break
+
+            if args.host_name in d['Aliases'].get('Items', []):
+                # TODO Remove the alias if a force option is given.
+                raise BadUserError("Existing distribution %s has this hostname set as an alternate domain name (CNAME), but it isn't associated with the correct origin bucket. Please remove the alternate domain name from the distribution or delete the distribution." % d['Id'])
         else:
             log('creating CloudFront distribution')
-            distribution = cf.create_distribution(
-                origin=origin, enabled=True)
-            log('created distribution: %s' % distribution.id)
+
+            creation_config = {}
+            set_required_config(creation_config)
+
+            # Set defaults for options that are required to create a distribution:
+            creation_config.setdefault('Comment', '')
+            default_cache_behavior = creation_config.setdefault('DefaultCacheBehavior', {})
+            trusted_signers = default_cache_behavior.setdefault('TrustedSigners', {})
+            trusted_signers.setdefault('Enabled', False)
+            trusted_signers.setdefault('Quantity', 0)
+            default_cache_behavior.setdefault('ViewerProtocolPolicy', 'allow-all')
+            default_cache_behavior.setdefault('MinTTL', 0)
+
+            set_caller_reference(creation_config)
+
+            distribution_creation_response = cf.create_distribution(
+                DistributionConfig=creation_config)
+            distribution = distribution_creation_response['Distribution']['DistributionConfig']
+            distribution['Id'] = distribution_creation_response['Distribution']['Id']
+            log('created distribution %s' % distribution['Id'])
             created_new_distribution = True
 
         if not created_new_distribution:
             log('checking distribution configuration')
-            distribution = cf.get_distribution_info(distribution.id)
 
-        if created_new_distribution or \
-            getattr(distribution.config, 'origin_access_identity', None) \
-                is not None or \
-            distribution.config.trusted_signers is not None or \
-            (not distribution.config.enabled) or \
-            args.host_name not in distribution.config.cnames:
+            get_distribution_config_response = cf.get_distribution_config(Id=distribution['Id'])
+            update_config = get_distribution_config_response['DistributionConfig']
 
-            log('configuring distribution')
+            if set_required_config(update_config):
+                log('configuring distribution')
 
-            distribution.config.origin_access_identity = None
-            distribution.config.trusted_signers = None
-            distribution.update(
-                enabled=True,
-                cnames=[args.host_name])
-        else:
-            log('distribution configuration already fine')
+                distribution = cf.update_distribution(
+                    Id=distribution['Id'],
+                    IfMatch=get_distribution_config_response['ETag'],
+                    DistributionConfig=update_config)['Distribution']['DistributionConfig']
+            else:
+                log('distribution configuration already fine')
+
+    sys.exit(0) # FIXME remove
 
     # TODO Set up custom MIME types.
     mimetypes.init()
