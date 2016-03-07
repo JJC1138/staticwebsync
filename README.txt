@@ -20,10 +20,10 @@ Copyright © 2001-2010 Python Software Foundation; All Rights Reserved
 and distributed under the licenses at:
 http://docs.python.org/license.html
 
-boto, which is:
-Copyright © 2006-2011 Mitch Garnaat http://garnaat.org/
-Copyright © 2010-2011 Eucalyptus Systems, Inc.
-and also distributed under the above MIT license.
+boto3, which is:
+Copyright © 2013-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+and distributed under the Apache License, Version 2.0 at:
+http://aws.amazon.com/apache2.0/
 
 and either:
 

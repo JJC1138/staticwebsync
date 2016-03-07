@@ -5,8 +5,6 @@ import os
 import sys
 import time
 
-import boto
-
 import staticwebsync
 
 def print_log(message):
