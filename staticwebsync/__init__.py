@@ -33,8 +33,10 @@ def split_all(s, splitter):
 def md5_hex_digest_string(filename):
     digestor = hashlib.md5()
     with open(filename, 'rb') as opened_file:
-        with mmap.mmap(opened_file.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-            digestor.update(mm)
+        fd = opened_file.fileno()
+        if os.fstat(fd).st_size > 0: # can't mmap empty files
+            with mmap.mmap(fd, 0, access=mmap.ACCESS_READ) as mm:
+                digestor.update(mm)
     return digestor.hexdigest()
 
 def setup(args):
