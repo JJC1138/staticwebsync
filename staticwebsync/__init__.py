@@ -2,11 +2,12 @@ __all__ = ('log', 'progress_callback', 'progress_callback_divisions',
     'BadUserError', 'setup')
 
 import binascii
+import hashlib
 import mimetypes
+import mmap
 import os
 import posixpath
 import re
-import sys # FIXME remove
 import time
 
 import boto3
@@ -14,7 +15,7 @@ import botocore
 
 log = None
 progress_callback_factory = lambda: None
-progress_callback_divisions = 10
+progress_callback_divisions = 10 # this is no longer used, but is retained so as not to break the module API
 
 MARKER_KEY_NAME = '.staticwebsync'
 
@@ -28,6 +29,13 @@ def split_all(s, splitter):
         s, tail = splitter(s)
         out.insert(0, tail)
     return out
+
+def md5_hex_digest_string(filename):
+    digestor = hashlib.md5()
+    with open(filename, 'rb') as opened_file:
+        with mmap.mmap(opened_file.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+            digestor.update(mm)
+    return digestor.hexdigest()
 
 def setup(args):
     prefix = 'http://'
@@ -157,6 +165,12 @@ def setup(args):
         website_configuration['ErrorDocument'] = { 'Key': args.error_page }
     bucket.Website().put(WebsiteConfiguration=website_configuration)
 
+    # http://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteEndpoints.html
+    website_endpoint = '%s.s3-website-%s.amazonaws.com' % (bucket.name, region)
+
+    def set_caller_reference(options):
+        options['CallerReference'] = binascii.b2a_hex(os.urandom(8)).decode('ascii')
+
     if use_cloudfront:
         cf = boto3.client('cloudfront',
             aws_access_key_id=args.access_key_id,
@@ -175,9 +189,6 @@ def setup(args):
                 raise BadUserError('Your AWS account is not signed up for CloudFront, please sign up at http://aws.amazon.com/cloudfront/')
             else:
                 raise e
-
-        # http://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteEndpoints.html
-        website_endpoint = '%s.s3-website-%s.amazonaws.com' % (bucket.name, region)
 
         def set_required_config(config):
             any_changed = False
@@ -243,9 +254,6 @@ def setup(args):
 
             return any_changed
 
-        def set_caller_reference(options):
-            options['CallerReference'] = binascii.b2a_hex(os.urandom(8)).decode('ascii')
-
         created_new_distribution = False
         for d in all_distributions:
             origins = d['Origins'].get('Items', [])
@@ -300,8 +308,6 @@ def setup(args):
             else:
                 log('distribution configuration already fine')
 
-    sys.exit(0) # FIXME remove
-
     # TODO Set up custom MIME types.
     mimetypes.init()
     # On my Windows system these get set to silly other values by some registry
@@ -345,14 +351,13 @@ def setup(args):
             if d == '.':
                 d = ''
 
-            local_file = open(inf, 'rb')
-
             type = mimetypes.guess_type(filename, strict=False)
-            headers = {}
+            upload_extra_args = {}
             if type[0] is not None:
-                headers['Content-Type'] = type[0]
+                # the lack of hyphens in the keys is correct, because these are method arguments rather than HTTP headers:
+                upload_extra_args['ContentType'] = type[0]
             if type[1] is not None:
-                headers['Content-Encoding'] = type[1]
+                upload_extra_args['ContentEncoding'] = type[1]
 
             def upload(f):
                 # We could re-use this when uploading the same file twice, but
@@ -367,34 +372,36 @@ def setup(args):
 
                 log('processing "%s" -> "%s"' % (inf, outf))
 
-                key = bucket.get_key(outf)
+                obj = s3.Object(bucket.name, outf)
 
-                existed = key is not None
-                if existed:
+                try:
+                    obj.load()
+                    existed = True
+
                     log('%s exists in bucket' % outf)
-                    md5 = key.compute_md5(local_file)
-                    if key.etag == '"%s"' % md5[0] and \
-                        key.content_type == headers.get(
-                            'Content-Type', key.content_type) and \
-                        key.content_encoding == headers.get('Content-Encoding'):
+                    md5 = md5_hex_digest_string(inf)
+                    if obj.e_tag == '"%s"' % md5 and \
+                        obj.content_type == upload_extra_args.get('ContentType', obj.content_type) and \
+                        obj.content_encoding == upload_extra_args.get('ContentEncoding'):
 
                         # TODO Check for other headers?
                         log('%s matches local file' % outf)
                         if not args.repair:
                             return
 
-                        policy = key.get_acl()
+                        acl = obj.Acl()
                         user_grant_okay = False
                         public_grant_okay = False
-                        for grant in policy.acl.grants:
-                            if grant.id == policy.owner.id:
-                                user_grant_okay = grant.permission == 'FULL_CONTROL'
+                        for grant in acl.grants:
+                            grantee = grant['Grantee']
+                            if grantee.get('ID') == acl.owner['ID']:
+                                user_grant_okay = grant['Permission'] == 'FULL_CONTROL'
                                 if not user_grant_okay:
                                     break
-                            elif grant.type == 'Group':
+                            elif grantee['Type'] == 'Group':
                                 public_grant_okay = \
-                                    grant.uri == 'http://acs.amazonaws.com/groups/global/AllUsers' and \
-                                    grant.permission == 'READ'
+                                    grantee['URI'] == 'http://acs.amazonaws.com/groups/global/AllUsers' and \
+                                    grant['Permission'] == 'READ'
                                 if not public_grant_okay:
                                     break
                             else:
@@ -404,16 +411,30 @@ def setup(args):
                                 log('%s ACL is fine' % outf)
                                 return
                         log('%s ACL is wrong' % outf)
-                else:
-                    key = bucket.new_key(outf)
+
+                except botocore.exceptions.ClientError as ce:
+                    if ce.response['Error']['Code'] != '404':
+                        raise ce
+                    existed = False
 
                 log('uploading %s' % outf)
-                key.set_contents_from_file(local_file,
-                    headers, policy='public-read', md5=md5,
-                    cb=progress_callback_factory(),
-                    num_cb=progress_callback_divisions)
+                upload_extra_args['ACL'] = 'public-read'
+
+                # Convert our callbacks to be compatible with the boto3 upload callback API:
+                class CallbackWrapper:
+                    def __init__(self, old_callback_factory, file_size):
+                        self.old_callback = old_callback_factory()
+                        self.file_size = file_size
+                        self.total_transferred = 0
+                    def __call__(self, newly_transferred_bytes_count):
+                        self.total_transferred += newly_transferred_bytes_count
+                        self.old_callback(self.file_size, self.total_transferred)
+
+                obj.upload_file(inf, ExtraArgs=upload_extra_args,
+                    Callback=CallbackWrapper(progress_callback_factory, os.path.getsize(inf)))
+
                 if existed:
-                    key_name = key.name
+                    key_name = obj.key
                     invalidations.append(key_name)
 
                     # Index pages are likely to be cached in CloudFront without the trailing filename instead (or as well).
@@ -423,12 +444,10 @@ def setup(args):
 
             upload(filename)
 
-            local_file.close()
+    log('checking for deleted files')
 
-    log('checking for changed or deleted files')
-
-    for key in bucket.list():
-        name = key.name
+    for obj in list(bucket.objects.all()):
+        name = obj.key
         if name == MARKER_KEY_NAME:
             continue
         if name.endswith('/'):
@@ -441,21 +460,20 @@ def setup(args):
                     blacklisted = True
                     break
         if not blacklisted and os.path.isfile(os.path.join(*parts)):
-            log('%s has corresponding local file' % key.name)
+            log('%s has corresponding local file' % obj.key)
             continue
-        log('deleting %s' % key.name)
-        key.delete()
-        invalidations.append(key.name)
+        log('deleting %s' % obj.key)
+        obj.delete()
+        invalidations.append(obj.key)
 
     sync_complete_message = '\nsync complete\na DNS entry needs to be set for\n%s\npointing to\n%s'
 
     if not use_cloudfront:
-        log(sync_complete_message % (
-            args.host_name, bucket.get_website_endpoint()))
+        log(sync_complete_message % (args.host_name, website_endpoint))
         return
 
     def cf_complete():
-        log(sync_complete_message % (args.host_name, distribution.domain_name))
+        log(sync_complete_message % (args.host_name, distribution['DomainName']))
 
         if (args.dont_wait_for_cloudfront_propagation):
             log('\nCloudFront may take up to 15 minutes to reflect any changes')
@@ -466,10 +484,10 @@ def setup(args):
         d = distribution
         while True:
             log('checking if CloudFront propagation is complete')
-            d = cf.get_distribution_info(d.id)
+            d = cf.get_distribution(Id=d['Id'])['Distribution']
 
-            if d.status != 'InProgress' and \
-                d.in_progress_invalidation_batches == 0:
+            if d['Status'] != 'InProgress' and \
+                d['InProgressInvalidationBatches'] == 0:
 
                 log('CloudFront propagation is complete')
                 return
@@ -484,16 +502,37 @@ def setup(args):
         return
 
     log('invalidating cached copies of changed or deleted files')
+
     def invalidate_all(paths):
-        # TODO Handle the error when exceeding the limit, and serialize the
-        # remaining paths so that we can restart later.
-        cf.create_invalidation_request(distribution.id, paths)
-        del paths[:]
+        batch = {
+            'Paths': {
+                'Quantity': len(paths),
+                'Items': paths,
+            },
+        }
+
+        while True:
+            try:
+                set_caller_reference(batch)
+                cf.create_invalidation(DistributionId=distribution['Id'], InvalidationBatch=batch)
+                break
+            except botocore.exceptions.ClientError as ce:
+                if ce.response['Error']['Code'] != 'TooManyInvalidationsInProgress':
+                    raise ce
+
+                interval = 60
+                log('too many invalidations in progress; trying again in %d seconds' % interval)
+                time.sleep(interval)
+
+        paths.clear()
+
     paths = []
+
     def invalidate(path):
         paths.append(path)
-        if len(paths) == 1000:
+        if len(paths) == 3000:
             invalidate_all(paths)
+
     for i in invalidations:
         invalidate('/' + i)
         if (i == args.index):

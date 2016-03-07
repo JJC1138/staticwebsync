@@ -18,7 +18,7 @@ class progress_reporter:
         self.start_time = time.time()
 
     def __call__(self, done, doing):
-        progress = float(done) / doing
+        progress = float(done) / doing if doing != 0 else 1
         kbytesps = (done / (time.time() - self.start_time)) / 1024
 
         bar_width = 50
@@ -36,7 +36,6 @@ def main():
     staticwebsync.log = print_log
     if sys.stdout.isatty():
         staticwebsync.progress_callback_factory = progress_reporter
-        staticwebsync.progress_callback_divisions = 50
 
     DEFAULT_LOCATION = 'us-east-1'
 
