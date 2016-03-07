@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
 import sys
 import time
 
@@ -46,15 +45,11 @@ def main():
     def help_text_with_default(text, default=None):
         return '%s [default: %s]' % (text, default if default is not None else '%(default)s')
 
-    AWS_ACCESS_KEY_ENV = 'AWS_ACCESS_KEY_ID'
-    arg_parser.add_argument('--access-key-id',
-        required=not AWS_ACCESS_KEY_ENV in os.environ,
-        help=help_text_with_default("Your Amazon Web Services access key ID", "the contents of the %s environment variable if it exists" % AWS_ACCESS_KEY_ENV))
+    arg_parser.add_argument('--access-key-id', default=None,
+        help=help_text_with_default("Your Amazon Web Services access key ID", "read from your ~/.aws/credentials file or the AWS_ACCESS_KEY_ID environment variable if they exist"))
 
-    AWS_SECRET_ACCESS_KEY_ENV = 'AWS_SECRET_ACCESS_KEY'
-    arg_parser.add_argument('--secret-access-key',
-        required=not AWS_SECRET_ACCESS_KEY_ENV in os.environ,
-        help=help_text_with_default("Your Amazon Web Services secret access key", "the contents of the %s environment variable if it exists" % AWS_SECRET_ACCESS_KEY_ENV))
+    arg_parser.add_argument('--secret-access-key', default=None,
+        help=help_text_with_default("Your Amazon Web Services secret access key", "read from your ~/.aws/credentials file or the AWS_SECRET_ACCESS_KEY environment variable if they exist"))
 
     arg_parser.add_argument('--index', default='index.html',
         help=help_text_with_default("The name of the default file that should be used for the root of the web-site and for requests that correspond to folder names without a filename"))

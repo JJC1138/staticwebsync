@@ -50,9 +50,11 @@ def setup(args):
 
     is_index_key = re.compile('(?P<path>^|.*?/)%s$' % re.escape(args.index))
 
-    s3 = boto3.resource('s3',
+    session = boto3.session.Session(
         aws_access_key_id=args.access_key_id,
         aws_secret_access_key=args.secret_access_key)
+
+    s3 = session.resource('s3')
 
     bucket = None
     region = None
@@ -65,6 +67,8 @@ def setup(args):
             raise BadUserError('Access denied: %s' % e.response['Error']['Message'])
         else:
             raise e
+    except botocore.exceptions.NoCredentialsError:
+        raise BadUserError('No AWS credentials found. Please set up your ~/.aws/credentials file or specify them on the command line.')
 
     use_cloudfront = not args.no_cloudfront
 
@@ -101,9 +105,7 @@ def setup(args):
             # http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGETlocation.html
             if region is None: region = 'us-east-1'
 
-            s3 = boto3.resource('s3', region_name=region,
-                aws_access_key_id=args.access_key_id,
-                aws_secret_access_key=args.secret_access_key)
+            s3 = session.resource('s3', region_name=region)
             bucket = s3.Bucket(b.name)
 
             if not object_or_none(b, MARKER_KEY_NAME):
@@ -128,9 +130,7 @@ def setup(args):
                 if region != 'us-east-1':
                     configuration = { 'LocationConstraint': region }
 
-                s3 = boto3.resource('s3', region_name=region,
-                    aws_access_key_id=args.access_key_id,
-                    aws_secret_access_key=args.secret_access_key)
+                s3 = session.resource('s3', region_name=region)
                 if configuration:
                     bucket = s3.create_bucket(
                         Bucket=bucket_name, CreateBucketConfiguration=configuration)
@@ -172,9 +172,7 @@ def setup(args):
         options['CallerReference'] = binascii.b2a_hex(os.urandom(8)).decode('ascii')
 
     if use_cloudfront:
-        cf = boto3.client('cloudfront',
-            aws_access_key_id=args.access_key_id,
-            aws_secret_access_key=args.secret_access_key)
+        cf = session.client('cloudfront')
 
         distribution = None
         all_distributions = []
