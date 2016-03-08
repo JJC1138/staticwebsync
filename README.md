@@ -4,6 +4,9 @@ staticwebsync is a command-line tool for automating the fiddly aspects of hostin
 
 For much more information see the [staticwebsync wiki](http://staticwebsync.jjc1138.net/)
 
+***
+
+##### Copyright
 
 Copyright © 2011-2016 Jon Colverson  
 and licensed under the [MIT License](https://opensource.org/licenses/MIT)
