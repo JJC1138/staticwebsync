@@ -442,7 +442,7 @@ def setup(args):
                         self.total_transferred = 0
                     def __call__(self, newly_transferred_bytes_count):
                         self.total_transferred += newly_transferred_bytes_count
-                        self.old_callback(self.file_size, self.total_transferred)
+                        self.old_callback(self.total_transferred, self.file_size)
 
                 obj.upload_file(inf, ExtraArgs=upload_extra_args,
                     Callback=CallbackWrapper(progress_callback_factory, os.path.getsize(inf)))
