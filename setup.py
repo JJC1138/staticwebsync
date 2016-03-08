@@ -1,6 +1,8 @@
 from setuptools import setup
 import sys
 
+import staticwebsync
+
 extra_options = {}
 if 'py2exe' in sys.argv:
     from glob import glob
