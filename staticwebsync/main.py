@@ -1,4 +1,5 @@
 import binascii
+import blessings
 import hashlib
 import mimetypes
 import mmap
@@ -35,21 +36,23 @@ def setup(args):
 
     from . import log, progress_callback_factory
 
+    term = blessings.Terminal()
+
     def log_check(msg):
         """Use this when reporting that we are about to check something."""
-        log(msg) # FIXME add color/formatting (or decide not to)
+        log(msg)
 
     def log_noop(msg):
         """Use this when reporting that we checked something and it was fine as-is so it didn't need to be changed."""
-        log(msg) # FIXME add color/formatting
+        log(term.bold_cyan(msg))
 
     def log_op(msg):
         """Use this when reporting that we changed something (uploaded a file, changed a setting etc.)"""
-        log(msg) # FIXME add color/formatting
+        log(term.bold_green(msg))
 
     def log_warn(msg):
         """Use this when warning the user about something."""
-        log(msg) # FIXME add color/formatting
+        log(term.bold_red(msg))
 
     prefix = 'http://'
     if args.host_name.startswith(prefix):
@@ -477,20 +480,20 @@ def setup(args):
         obj.delete()
         invalidations.append(obj.key)
 
-    sync_complete_message = '\nsync complete\na DNS entry needs to be set for\n%s\npointing to\n%s'
+    def log_sync_complete(dns_entry_name, dns_entry_target):
+        log_op('sync complete')
+        log_check('a DNS entry needs to be set for\n%s\npointing to\n%s' % (dns_entry_name, dns_entry_target))
 
     if not use_cloudfront:
-        log_op(sync_complete_message % (args.host_name, website_endpoint))
+        log_sync_complete(args.host_name, website_endpoint)
         return
 
     def cf_complete():
-        log_op(sync_complete_message % (args.host_name, distribution['DomainName']))
+        log_sync_complete(args.host_name, distribution['DomainName'])
 
         if (args.dont_wait_for_cloudfront_propagation):
-            log_noop('\nCloudFront may take up to 15 minutes to reflect any changes')
+            log_noop('CloudFront may take up to 15 minutes to reflect any changes')
             return
-
-        log('')
 
         d = distribution
         while True:

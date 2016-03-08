@@ -45,7 +45,7 @@ setup(
     long_description=open('README.txt').read(),
 
     entry_points={'console_scripts': ['sws = staticwebsync.sws:main']},
-    install_requires=['boto3'],
+    install_requires=['boto3', 'blessings', 'colorama'],
 
     **extra_options
 )

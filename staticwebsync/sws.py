@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import colorama
 import sys
 import time
 
@@ -30,6 +31,8 @@ class progress_reporter:
             print('\r' + (' ' * 80), end='\r')
 
 def main():
+    colorama.init()
+
     staticwebsync.log = print_log
     if sys.stdout.isatty():
         staticwebsync.progress_callback_factory = progress_reporter
