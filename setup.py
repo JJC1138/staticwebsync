@@ -1,7 +1,7 @@
 from setuptools import setup
 import sys
 
-import staticwebsync
+import staticwebsync # this is to invoke the Python version check in the package's __init__.py
 
 extra_options = {}
 if 'py2exe' in sys.argv:
