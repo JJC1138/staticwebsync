@@ -10,49 +10,47 @@ import time
 import boto3
 import botocore
 
-log = None
-progress_callback_factory = lambda: None
-progress_callback_divisions = 10 # this is no longer used, but is retained so as not to break the module API
-
 MARKER_KEY_NAME = '.staticwebsync'
 
 class BadUserError(Exception):
     def __init__(self, message):
         self.message = message
 
-def split_all(s, splitter):
-    out = []
-    while len(s) != 0:
-        s, tail = splitter(s)
-        out.insert(0, tail)
-    return out
-
-def md5_hex_digest_string(filename):
-    digestor = hashlib.md5()
-    with open(filename, 'rb') as opened_file:
-        fd = opened_file.fileno()
-        if os.fstat(fd).st_size > 0: # can't mmap empty files
-            with mmap.mmap(fd, 0, access=mmap.ACCESS_READ) as mm:
-                digestor.update(mm)
-    return digestor.hexdigest()
-
-def log_check(msg):
-    """Use this when reporting that we are about to check something."""
-    log(msg) # FIXME add color/formatting (or decide not to)
-
-def log_noop(msg):
-    """Use this when reporting that we checked something and it was fine as-is so it didn't need to be changed."""
-    log(msg) # FIXME add color/formatting
-
-def log_op(msg):
-    """Use this when reporting that we changed something (uploaded a file, changed a setting etc.)"""
-    log(msg) # FIXME add color/formatting
-
-def log_warn(msg):
-    """Use this when warning the user about something."""
-    log(msg) # FIXME add color/formatting
-
 def setup(args):
+    def split_all(s, splitter):
+        out = []
+        while len(s) != 0:
+            s, tail = splitter(s)
+            out.insert(0, tail)
+        return out
+
+    def md5_hex_digest_string(filename):
+        digestor = hashlib.md5()
+        with open(filename, 'rb') as opened_file:
+            fd = opened_file.fileno()
+            if os.fstat(fd).st_size > 0: # can't mmap empty files
+                with mmap.mmap(fd, 0, access=mmap.ACCESS_READ) as mm:
+                    digestor.update(mm)
+        return digestor.hexdigest()
+
+    from . import log, progress_callback_factory
+
+    def log_check(msg):
+        """Use this when reporting that we are about to check something."""
+        log(msg) # FIXME add color/formatting (or decide not to)
+
+    def log_noop(msg):
+        """Use this when reporting that we checked something and it was fine as-is so it didn't need to be changed."""
+        log(msg) # FIXME add color/formatting
+
+    def log_op(msg):
+        """Use this when reporting that we changed something (uploaded a file, changed a setting etc.)"""
+        log(msg) # FIXME add color/formatting
+
+    def log_warn(msg):
+        """Use this when warning the user about something."""
+        log(msg) # FIXME add color/formatting
+
     prefix = 'http://'
     if args.host_name.startswith(prefix):
         args.host_name = args.host_name[len(prefix):]
