@@ -103,9 +103,7 @@ def setup(args):
                 raise e
 
     for b in all_buckets:
-        if b.name == standard_bucket_name or \
-            b.name.startswith(standard_bucket_name + '-'):
-
+        if b.name == standard_bucket_name or b.name.startswith(standard_bucket_name + '-'):
             log_noop('found existing bucket %s' % b.name)
 
             # The bucket location must be set in boto so that it can use the
@@ -114,8 +112,7 @@ def setup(args):
             # That's required because otherwise requests on buckets with dots
             # in their names fail HTTPS validation:
             # https://github.com/boto/boto/issues/2836
-            region = s3.meta.client.get_bucket_location(
-                Bucket=b.name)['LocationConstraint']
+            region = s3.meta.client.get_bucket_location(Bucket=b.name)['LocationConstraint']
 
             # That API returns None when the region is us-east-1:
             # http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGETlocation.html
@@ -148,26 +145,21 @@ def setup(args):
 
                 s3 = session.resource('s3', region_name=region)
                 if configuration:
-                    bucket = s3.create_bucket(
-                        Bucket=bucket_name, CreateBucketConfiguration=configuration)
+                    bucket = s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=configuration)
                 else:
-                    bucket = s3.create_bucket(
-                        Bucket=bucket_name)
+                    bucket = s3.create_bucket(Bucket=bucket_name)
 
                 install_marker_key(bucket)
                 break
             except botocore.exceptions.ClientError as e:
                 if e.response['Error']['Code'] == 'BucketAlreadyExists':
-                    log_warn('bucket %s was already used by another user' %
-                        bucket_name)
+                    log_warn('bucket %s was already used by another user' % bucket_name)
                     if first_fail:
                         log_warn('We can use an alternative bucket name, but this will only work with CloudFront and not with standard S3 web site hosting (because it requires the bucket name to match the host name).')
                         first_fail = False
                     if not use_cloudfront:
                         raise BadUserError("Using CloudFront is disabled, so we can't continue.")
-                    bucket_name = \
-                        standard_bucket_name + \
-                        '-' + binascii.b2a_hex(os.urandom(8)).decode('ascii')
+                    bucket_name = standard_bucket_name + '-' + binascii.b2a_hex(os.urandom(8)).decode('ascii')
                     continue
                 else:
                     raise e
@@ -194,8 +186,7 @@ def setup(args):
         all_distributions = []
         try:
             log_check('looking for existing CloudFront distribution')
-            distribution_lists = \
-                list(cf.get_paginator('list_distributions').paginate())
+            distribution_lists = list(cf.get_paginator('list_distributions').paginate())
             for distribution_list in distribution_lists:
                 all_distributions.extend(distribution_list['DistributionList'].get('Items', []))
         except botocore.exceptions.ClientError as e:
@@ -500,15 +491,12 @@ def setup(args):
             log_check('checking if CloudFront propagation is complete')
             d = cf.get_distribution(Id=d['Id'])['Distribution']
 
-            if d['Status'] != 'InProgress' and \
-                d['InProgressInvalidationBatches'] == 0:
-
+            if d['Status'] != 'InProgress' and d['InProgressInvalidationBatches'] == 0:
                 log_op('CloudFront propagation is complete')
                 return
 
             interval = 15
-            log_check('propagation still in progress; checking again in %d seconds' %
-                interval)
+            log_check('propagation still in progress; checking again in %d seconds' % interval)
             time.sleep(interval)
 
     if len(invalidations) == 0:
