@@ -36,6 +36,22 @@ def md5_hex_digest_string(filename):
                 digestor.update(mm)
     return digestor.hexdigest()
 
+def log_check(msg):
+    """Use this when reporting that we are about to check something."""
+    log(msg) # FIXME add color/formatting (or decide not to)
+
+def log_noop(msg):
+    """Use this when reporting that we checked something and it was fine as-is so it didn't need to be changed."""
+    log(msg) # FIXME add color/formatting
+
+def log_op(msg):
+    """Use this when reporting that we changed something (uploaded a file, changed a setting etc.)"""
+    log(msg) # FIXME add color/formatting
+
+def log_warn(msg):
+    """Use this when warning the user about something."""
+    log(msg) # FIXME add color/formatting
+
 def setup(args):
     prefix = 'http://'
     if args.host_name.startswith(prefix):
@@ -59,7 +75,7 @@ def setup(args):
     region = None
     all_buckets = None
     try:
-        log('looking for existing S3 bucket')
+        log_check('looking for existing S3 bucket')
         all_buckets = list(s3.buckets.all())
     except botocore.exceptions.ClientError as e:
         if e.response['ResponseMetadata']['HTTPStatusCode'] == 403:
@@ -89,7 +105,7 @@ def setup(args):
         if b.name == standard_bucket_name or \
             b.name.startswith(standard_bucket_name + '-'):
 
-            log('found existing bucket %s' % b.name)
+            log_noop('found existing bucket %s' % b.name)
 
             # The bucket location must be set in boto so that it can use the
             # path addressing style:
@@ -119,7 +135,7 @@ def setup(args):
         first_fail = True
         while True:
             try:
-                log('creating bucket %s' % bucket_name)
+                log_op('creating bucket %s' % bucket_name)
 
                 configuration = None
 
@@ -141,10 +157,10 @@ def setup(args):
                 break
             except botocore.exceptions.ClientError as e:
                 if e.response['Error']['Code'] == 'BucketAlreadyExists':
-                    log('bucket %s was already used by another user' %
+                    log_warn('bucket %s was already used by another user' %
                         bucket_name)
                     if first_fail:
-                        log('We can use an alternative bucket name, but this will only work with CloudFront and not with standard S3 web site hosting (because it requires the bucket name to match the host name).')
+                        log_warn('We can use an alternative bucket name, but this will only work with CloudFront and not with standard S3 web site hosting (because it requires the bucket name to match the host name).')
                         first_fail = False
                     if not use_cloudfront:
                         raise BadUserError("Using CloudFront is disabled, so we can't continue.")
@@ -155,10 +171,10 @@ def setup(args):
                 else:
                     raise e
 
-    log('configuring bucket ACL policy')
+    log_op('configuring bucket ACL policy')
     bucket.Acl().put(ACL='private')
 
-    log('configuring bucket for website access')
+    log_op('configuring bucket for website access')
     website_configuration = { 'IndexDocument': { 'Suffix': args.index } }
     if args.error_page is not None:
         website_configuration['ErrorDocument'] = { 'Key': args.error_page }
@@ -176,7 +192,7 @@ def setup(args):
         distribution = None
         all_distributions = []
         try:
-            log('looking for existing CloudFront distribution')
+            log_check('looking for existing CloudFront distribution')
             distribution_lists = \
                 list(cf.get_paginator('list_distributions').paginate())
             for distribution_list in distribution_lists:
@@ -259,14 +275,14 @@ def setup(args):
 
                 if origin['DomainName'] == website_endpoint:
                     distribution = d
-                    log('found distribution: %s' % d['Id'])
+                    log_noop('found distribution: %s' % d['Id'])
                     break
 
             if args.host_name in d['Aliases'].get('Items', []):
                 # TODO Remove the alias if a force option is given.
                 raise BadUserError("Existing distribution %s has this hostname set as an alternate domain name (CNAME), but it isn't associated with the correct origin bucket. Please remove the alternate domain name from the distribution or delete the distribution." % d['Id'])
         else:
-            log('creating CloudFront distribution')
+            log_op('creating CloudFront distribution')
 
             creation_config = {}
             set_required_config(creation_config)
@@ -286,24 +302,24 @@ def setup(args):
                 DistributionConfig=creation_config)
             distribution = distribution_creation_response['Distribution']['DistributionConfig']
             distribution['Id'] = distribution_creation_response['Distribution']['Id']
-            log('created distribution %s' % distribution['Id'])
+            log_op('created distribution %s' % distribution['Id'])
             created_new_distribution = True
 
         if not created_new_distribution:
-            log('checking distribution configuration')
+            log_check('checking distribution configuration')
 
             get_distribution_config_response = cf.get_distribution_config(Id=distribution['Id'])
             update_config = get_distribution_config_response['DistributionConfig']
 
             if set_required_config(update_config):
-                log('configuring distribution')
+                log_op('configuring distribution')
 
                 distribution = cf.update_distribution(
                     Id=distribution['Id'],
                     IfMatch=get_distribution_config_response['ETag'],
                     DistributionConfig=update_config)['Distribution']['DistributionConfig']
             else:
-                log('distribution configuration already fine')
+                log_noop('distribution configuration already fine')
 
     # TODO Set up custom MIME types.
     mimetypes.init()
@@ -331,7 +347,7 @@ def setup(args):
             blacklisted = False
             for p in split_all(dirpath, os.path.split):
                 if p.startswith('.') and p != '.':
-                    log('skipping folder %s' % os.path.normpath(dirpath))
+                    log_noop('skipping folder %s' % os.path.normpath(dirpath))
                     blacklisted = True
                     break
             if blacklisted:
@@ -339,7 +355,7 @@ def setup(args):
 
         for filename in filenames:
             if not args.allow_dot_files and filename.startswith('.'):
-                log('skipping file %s' % filename)
+                log_noop('skipping file %s' % filename)
                 continue
 
             inf = os.path.normpath(os.path.join(dirpath, filename))
@@ -367,7 +383,7 @@ def setup(args):
                 if outf == '':
                     outf = args.index
 
-                log('processing "%s" -> "%s"' % (inf, outf))
+                log_check('processing "%s" -> "%s"' % (inf, outf))
 
                 obj = s3.Object(bucket.name, outf)
 
@@ -375,14 +391,14 @@ def setup(args):
                     obj.load()
                     existed = True
 
-                    log('%s exists in bucket' % outf)
+                    log_noop('%s exists in bucket' % outf)
                     md5 = md5_hex_digest_string(inf)
                     if obj.e_tag == '"%s"' % md5 and \
                         obj.content_type == upload_extra_args.get('ContentType', obj.content_type) and \
                         obj.content_encoding == upload_extra_args.get('ContentEncoding'):
 
                         # TODO Check for other headers?
-                        log('%s matches local file' % outf)
+                        log_noop('%s matches local file' % outf)
                         if not args.repair:
                             return
 
@@ -405,16 +421,16 @@ def setup(args):
                                 break
                         else:
                             if user_grant_okay and public_grant_okay:
-                                log('%s ACL is fine' % outf)
+                                log_noop('%s ACL is fine' % outf)
                                 return
-                        log('%s ACL is wrong' % outf)
+                        log_op('%s ACL is wrong' % outf)
 
                 except botocore.exceptions.ClientError as ce:
                     if ce.response['Error']['Code'] != '404':
                         raise ce
                     existed = False
 
-                log('uploading %s' % outf)
+                log_op('uploading %s' % outf)
                 upload_extra_args['ACL'] = 'public-read'
 
                 # Convert our callbacks to be compatible with the boto3 upload callback API:
@@ -441,7 +457,7 @@ def setup(args):
 
             upload(filename)
 
-    log('checking for deleted files')
+    log_check('checking for deleted files')
 
     for obj in list(bucket.objects.all()):
         name = obj.key
@@ -457,40 +473,40 @@ def setup(args):
                     blacklisted = True
                     break
         if not blacklisted and os.path.isfile(os.path.join(*parts)):
-            log('%s has corresponding local file' % obj.key)
+            log_noop('%s has corresponding local file' % obj.key)
             continue
-        log('deleting %s' % obj.key)
+        log_op('deleting %s' % obj.key)
         obj.delete()
         invalidations.append(obj.key)
 
     sync_complete_message = '\nsync complete\na DNS entry needs to be set for\n%s\npointing to\n%s'
 
     if not use_cloudfront:
-        log(sync_complete_message % (args.host_name, website_endpoint))
+        log_op(sync_complete_message % (args.host_name, website_endpoint))
         return
 
     def cf_complete():
-        log(sync_complete_message % (args.host_name, distribution['DomainName']))
+        log_op(sync_complete_message % (args.host_name, distribution['DomainName']))
 
         if (args.dont_wait_for_cloudfront_propagation):
-            log('\nCloudFront may take up to 15 minutes to reflect any changes')
+            log_noop('\nCloudFront may take up to 15 minutes to reflect any changes')
             return
 
         log('')
 
         d = distribution
         while True:
-            log('checking if CloudFront propagation is complete')
+            log_check('checking if CloudFront propagation is complete')
             d = cf.get_distribution(Id=d['Id'])['Distribution']
 
             if d['Status'] != 'InProgress' and \
                 d['InProgressInvalidationBatches'] == 0:
 
-                log('CloudFront propagation is complete')
+                log_op('CloudFront propagation is complete')
                 return
 
             interval = 15
-            log('propagation still in progress; checking again in %d seconds' %
+            log_check('propagation still in progress; checking again in %d seconds' %
                 interval)
             time.sleep(interval)
 
@@ -498,7 +514,7 @@ def setup(args):
         cf_complete()
         return
 
-    log('invalidating cached copies of changed or deleted files')
+    log_op('invalidating cached copies of changed or deleted files')
 
     def invalidate_all(paths):
         batch = {
@@ -518,7 +534,7 @@ def setup(args):
                     raise ce
 
                 interval = 60
-                log('too many invalidations in progress; trying again in %d seconds' % interval)
+                log_check('too many invalidations in progress; trying again in %d seconds' % interval)
                 time.sleep(interval)
 
         paths.clear()
