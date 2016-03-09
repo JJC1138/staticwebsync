@@ -7,7 +7,7 @@ if sys.version_info < REQUIRED_PYTHON_VERSION:
 
 setup(
     name='staticwebsync',
-    version='1.1.0',
+    version='1.1.1',
     author='Jon Colverson',
     author_email='staticwebsync@jjc1138.net',
     packages=['staticwebsync'],
