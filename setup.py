@@ -1,51 +1,18 @@
 from setuptools import setup
-import sys
 
 import staticwebsync # this is to invoke the Python version check in the package's __init__.py
 
-extra_options = {}
-if 'py2exe' in sys.argv:
-    from glob import glob
-    import py2exe
-    extra_options.update(
-        console=['staticwebsync/sws.py'],
-        zipfile=None,
-        options={'py2exe': {
-            'bundle_files': 1,
-            'packages': ['email'],
-            'dll_excludes': ['w9xpopen.exe'],
-            'ignores': ['_scproxy', 'email.Encoders', 'email.MIMEBase',
-                'email.MIMEMultipart', 'email.MIMEText', 'email.Utils', 'lxml',
-                'netbios', 'simplejson', 'win32evtlog', 'win32evtlogutil',
-                'win32wnet'],
-        }},
-        data_files=[('Microsoft.VC90.CRT', glob(
-            r'C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\redist\x86\Microsoft.VC90.CRT\*.*'))],
-    )
-
-if 'py2app' in sys.argv:
-    extra_options.update(
-        setup_requires=['py2app'],
-        app=['staticwebsync/sws.py'],
-        options={'py2app': {
-            'packages': ['email'],
-            'no_chdir': True,
-        }},
-    )
-
 setup(
     name='staticwebsync',
-    version='1.0.2',
+    version='1.1.0',
     maintainer='Jon Colverson',
     maintainer_email='staticwebsync@jjc1138.net',
     packages=['staticwebsync'],
     url='http://staticwebsync.jjc1138.net/',
     license='MIT',
     description='Automates setting up S3/CloudFront for web site hosting',
-    long_description=open('README.txt').read(),
+    long_description='staticwebsync is a command-line tool for automating the fiddly aspects of hosting your static web site on Amazon S3 or CloudFront. It automates the process of configuring the services for hosting web sites, and synchronizes the contents of a local folder to the site.',
 
     entry_points={'console_scripts': ['sws = staticwebsync.sws:main']},
     install_requires=['boto3', 'blessings', 'colorama'],
-
-    **extra_options
 )
