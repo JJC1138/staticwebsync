@@ -1,6 +1,9 @@
 from setuptools import setup
 
-import staticwebsync # this is to invoke the Python version check in the package's __init__.py
+import sys
+REQUIRED_PYTHON_VERSION = (3,)
+if sys.version_info < REQUIRED_PYTHON_VERSION:
+    exit('Python version %s or higher is required.' % '.'.join(map(str, REQUIRED_PYTHON_VERSION)))
 
 setup(
     name='staticwebsync',
