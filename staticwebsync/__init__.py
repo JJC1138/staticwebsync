@@ -184,13 +184,12 @@ def setup(args):
     if use_cloudfront:
         cf = session.client('cloudfront')
 
-        distribution = None
-        all_distributions = []
+        all_distribution_summaries = []
         try:
             log_check('looking for existing CloudFront distribution')
             distribution_lists = list(cf.get_paginator('list_distributions').paginate())
             for distribution_list in distribution_lists:
-                all_distributions.extend(distribution_list['DistributionList'].get('Items', []))
+                all_distribution_summaries.extend(distribution_list['DistributionList'].get('Items', []))
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'OptInRequired':
                 raise BadUserError('Your AWS account is not signed up for CloudFront, please sign up at http://aws.amazon.com/cloudfront/')
@@ -262,19 +261,20 @@ def setup(args):
             return any_changed
 
         created_new_distribution = False
-        for d in all_distributions:
-            origins = d['Origins'].get('Items', [])
+        for distribution_summary in all_distribution_summaries:
+            origins = distribution_summary['Origins'].get('Items', [])
             if len(origins) == 1:
                 origin = origins[0]
 
                 if origin['DomainName'] == website_endpoint:
-                    distribution = d
-                    log_noop('found distribution: %s' % d['Id'])
+                    distribution_id = distribution_summary['Id']
+                    distribution_domain_name = distribution_summary['DomainName']
+                    log_noop('found distribution: %s' % distribution_id)
                     break
 
-            if args.host_name in d['Aliases'].get('Items', []):
+            if args.host_name in distribution_summary['Aliases'].get('Items', []):
                 # TODO Remove the alias if a force option is given.
-                raise BadUserError("Existing distribution %s has this hostname set as an alternate domain name (CNAME), but it isn't associated with the correct origin bucket. Please remove the alternate domain name from the distribution or delete the distribution." % d['Id'])
+                raise BadUserError("Existing distribution %s has this hostname set as an alternate domain name (CNAME), but it isn't associated with the correct origin bucket. Please remove the alternate domain name from the distribution or delete the distribution." % distribution_summary['Id'])
         else:
             log_op('creating CloudFront distribution')
 
@@ -292,26 +292,25 @@ def setup(args):
 
             set_caller_reference(creation_config)
 
-            distribution_creation_response = cf.create_distribution(
-                DistributionConfig=creation_config)
-            distribution = distribution_creation_response['Distribution']['DistributionConfig']
-            distribution['Id'] = distribution_creation_response['Distribution']['Id']
-            log_op('created distribution %s' % distribution['Id'])
+            distribution_creation_response = cf.create_distribution(DistributionConfig=creation_config)
+            distribution_id = distribution_creation_response['Distribution']['Id']
+            distribution_domain_name = distribution_creation_response['Distribution']['DomainName']
+            log_op('created distribution %s' % distribution_id)
             created_new_distribution = True
 
         if not created_new_distribution:
             log_check('checking distribution configuration')
 
-            get_distribution_config_response = cf.get_distribution_config(Id=distribution['Id'])
+            get_distribution_config_response = cf.get_distribution_config(Id=distribution_id)
             update_config = get_distribution_config_response['DistributionConfig']
 
             if set_required_config(update_config):
                 log_op('configuring distribution')
 
-                distribution = cf.update_distribution(
-                    Id=distribution['Id'],
+                cf.update_distribution(
+                    Id=distribution_id,
                     IfMatch=get_distribution_config_response['ETag'],
-                    DistributionConfig=update_config)['Distribution']['DistributionConfig']
+                    DistributionConfig=update_config)
             else:
                 log_noop('distribution configuration already fine')
 
@@ -482,18 +481,19 @@ def setup(args):
         return
 
     def cf_complete():
-        log_sync_complete(args.host_name, distribution['DomainName'])
+        log_sync_complete(args.host_name, distribution_domain_name)
 
         if (args.dont_wait_for_cloudfront_propagation):
             log_noop('CloudFront may take up to 15 minutes to reflect any changes')
             return
 
-        d = distribution
         while True:
             log_check('checking if CloudFront propagation is complete')
-            d = cf.get_distribution(Id=d['Id'])['Distribution']
+            get_distribution_response = cf.get_distribution(Id=distribution_id)['Distribution']
 
-            if d['Status'] != 'InProgress' and d['InProgressInvalidationBatches'] == 0:
+            if get_distribution_response['Status'] != 'InProgress' and \
+                get_distribution_response['InProgressInvalidationBatches'] == 0:
+
                 log_op('CloudFront propagation is complete')
                 return
 
@@ -518,7 +518,7 @@ def setup(args):
         while True:
             try:
                 set_caller_reference(batch)
-                cf.create_invalidation(DistributionId=distribution['Id'], InvalidationBatch=batch)
+                cf.create_invalidation(DistributionId=distribution_id, InvalidationBatch=batch)
                 break
             except botocore.exceptions.ClientError as ce:
                 if ce.response['Error']['Code'] != 'TooManyInvalidationsInProgress':
