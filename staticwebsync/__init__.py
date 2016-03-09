@@ -1,7 +1,6 @@
 __all__ = ('log', 'progress_callback_factory', 'progress_callback_divisions', 'BadUserError', 'setup')
 
 import binascii
-import blessings
 import hashlib
 import mimetypes
 import mmap
@@ -12,6 +11,7 @@ import time
 
 import boto3
 import botocore
+import termcolor
 
 log = lambda msg: None
 progress_callback_factory = lambda: None
@@ -38,23 +38,21 @@ def setup(args):
                     digestor.update(mm)
         return digestor.hexdigest()
 
-    term = blessings.Terminal()
-
     def log_check(msg):
         """Use this when reporting that we are about to check something."""
         log(msg)
 
     def log_noop(msg):
         """Use this when reporting that we checked something and it was fine as-is so it didn't need to be changed."""
-        log(term.bold_cyan(msg))
+        log(termcolor.colored(msg, 'cyan', attrs=['bold']))
 
     def log_op(msg):
         """Use this when reporting that we changed something (uploaded a file, changed a setting etc.)"""
-        log(term.bold_green(msg))
+        log(termcolor.colored(msg, 'green', attrs=['bold']))
 
     def log_warn(msg):
         """Use this when warning the user about something."""
-        log(term.bold_red(msg))
+        log(termcolor.colored(msg, 'red', attrs=['bold']))
 
     prefix = 'http://'
     if args.host_name.startswith(prefix):
