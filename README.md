@@ -90,8 +90,8 @@ and that will sync the contents of yourlocalfolder to S3 and CloudFront, automat
 
 ### <a name="whynots3cf"></a>Why wouldn't I want to host my web site on S3/CloudFront?
 
-* As the name suggests, staticwebsync is only for _static_ sites, that is, sites that are just a bunch of ordinary HTML files (and images and Javascript etc.), so it doesn't work with anything that needs server-side scripting, such as PHP. That means that it can't be used out-of-the-box with blogging or CMS systems like Wordpress.
-* S3 doesn't currently support using HTTPS (SSL) transfers for web site hosting, so you shouldn't it for web sites with private data. The way staticwebsync configures things, if you use CloudFront then you can use HTTPS for accessing your site through the ".cloudfront.net" domain, but that is misleading because the data is still transferred from S3 to CloudFront using a regular unencrypted HTTP connection so it doesn't provide full security (for anyone interested: we have to use the http-only CloudFront origin policy because the S3 website endpoints don't currently support HTTPS).
+* As the name suggests, staticwebsync is only for _static_ sites, that is, sites that are just a bunch of ordinary HTML files (and images and Javascript etc.), so it doesn't work with anything that needs server-side scripting, such as PHP. That means that it can't be used out-of-the-box with blogging/CMS systems like Wordpress.
+* S3 doesn't currently support using HTTPS (SSL) transfers for web site hosting, so you shouldn't use it for web sites with private data. The way staticwebsync configures things, if you use CloudFront then you can use HTTPS for accessing your site through the ".cloudfront.net" domain, but that is misleading because the data is still transferred from S3 to CloudFront using a regular unencrypted HTTP connection so it doesn't provide full security (for anyone interested: we have to use the http-only CloudFront origin policy because the S3 website endpoints don't currently support HTTPS).
 
 ### <a name="howto"></a>How to use staticwebsync
 
