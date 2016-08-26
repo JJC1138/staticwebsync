@@ -72,7 +72,7 @@ Hosting a site using S3 and CloudFront has some distinct advantages over traditi
 * **Reliability** Amazon S3 has a [99.9% uptime service level agreement](http://aws.amazon.com/s3/sla/).
 
 ### <a name="whysws"></a>Why would I want to use staticwebsync to set it up?
-Configuring S3 and CloudFront for web site hosting requires a number of steps that have to be done manually when using other tools, and synchronizing new/changed files also requires effort to get right. The goal of staticwebsync is that you should be use it without having to know anything about the details of how S3 and CloudFront work. You simply use a command like:
+Configuring S3 and CloudFront for web site hosting requires a number of steps that have to be done manually when using other tools, and synchronizing new/changed files also requires effort to get right. The goal of staticwebsync is that you should be able to use it without having to know anything about the details of how S3 and CloudFront work. You simply use a command like:
 
 `sws www.example.com yourlocalfolder`
 
