@@ -25,8 +25,8 @@ First install Python from [python.org](https://www.python.org/downloads/) if you
 # change to your home directory:
 cd
 # set up a directory to install staticwebsync into by giving a new directory name
-# to pyvenv:
-pyvenv staticwebsync
+# to venv:
+python3 -m venv staticwebsync
 # install staticwebsync and its dependencies:
 staticwebsync/bin/pip install staticwebsync
 # (optional) put a link in your path so that you can run it just by typing sws:
@@ -38,7 +38,7 @@ sudo ln -s `pwd`/staticwebsync/bin/sws /usr/local/bin/
 REM change to your home directory:
 cd %HOMEPATH%
 REM set up a directory to install staticwebsync into by giving a new directory
-REM name to pyvenv:
+REM name to venv:
 py -3 -m venv staticwebsync
 REM install staticwebsync and its dependencies:
 staticwebsync\Scripts\pip install staticwebsync
